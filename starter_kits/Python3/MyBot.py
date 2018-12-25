@@ -38,13 +38,9 @@ def push_decision(ship, direction):
     global next_map
     global command_queue
 
-    if isinstance(direction, str):
-        next_map[ship.position] = True
-        command_queue.append(ship.stay_still())
-    else:
-        position = ship.position.directional_offset(direction)
-        next_map[position] = True
-        command_queue.append(ship.move(direction))
+    position = ship.position.directional_offset(direction)
+    next_map[position] = True
+    command_queue.append(ship.move(direction))
 
 def can_move(ship):
     global game_map
@@ -71,9 +67,8 @@ def chose_random_move(ship, moves):
     global command_queue
 
     if len(moves) == 0:
-        chosen_direction = "stay_still"
-    else:
-        chosen_direction = random.choice(moves)
+        moves.append(Direction.Still)
+    chosen_direction = random.choice(moves)
     push_decision(ship, chosen_direction)
 
 def greedy_chose_smallest_square_move(ship, moves):
@@ -81,9 +76,9 @@ def greedy_chose_smallest_square_move(ship, moves):
     global game_map
 
     if len(moves) == 0:
-        chosen_direction = "stay_still"
-    else:
-        chosen_direction = sorted(moves, key=lambda move: game_map[ship.position.directional_offset(move)].halite_amount, reverse=True)[0]
+        moves.append(Direction.Still)
+
+    chosen_direction = sorted(moves, key=lambda move: game_map[ship.position.directional_offset(move)].halite_amount, reverse=True)[0]
     push_decision(ship, chosen_direction)
 
 
@@ -108,7 +103,7 @@ def go_home_full(ship):
     global game_map
 
     if ship.halite_amount < 900 and game_map[ship.position].halite_amount > 30:
-        push_decision(ship, "stay_still")
+        push_decision(ship, Direction.Still)
     else:
         go_home(ship)
 
@@ -160,7 +155,7 @@ while True:
             run_far_moves = exclude_going_closer(ship.position, safe_moves, me.shipyard.position)
             chose_random_move(ship, run_far_moves)
         else:
-            push_decision(ship, "stay_still")
+            push_decision(ship, Direction.Still)
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
