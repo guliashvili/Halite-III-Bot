@@ -32,8 +32,6 @@ logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
 
 """ <<<Game Loop>>> """
 
-RATIO_TO_GO_HOME = 80
-
 def push_decision(ship, direction):
     global next_map
     global command_queue
