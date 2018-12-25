@@ -1,4 +1,5 @@
 import queue
+import random
 
 from . import constants
 from .entity import Entity, Shipyard, Ship, Dropoff
@@ -123,7 +124,7 @@ class GameMap:
         return (Direction.South if target.y > source.y else Direction.North if target.y < source.y else None,
                 Direction.East if target.x > source.x else Direction.West if target.x < source.x else None)
 
-    def get_unsafe_moves(self, source, destination):
+    def _get_unsafe_moves(self, source, destination):
         """
         Return the Direction(s) to move closer to the target point, or empty if the points are the same.
         This move mechanic does not account for collisions. The multiple directions are if both directional movements
@@ -146,7 +147,20 @@ class GameMap:
                                   else Direction.invert(y_cardinality))
         return possible_moves
 
-    def naive_navigate(self, ship, destination):
+    def get_safe_moves(self, source, target=None, recall=False, direction_candidates=set([Direction.North, Direction.South, Direction.East, Direction.West, Direction.Still])):
+        safe_directions = []
+
+        possible_directions = direction_candidates
+        if target is not None:
+            possible_directions = possible_directions & set(self._get_unsafe_moves(source, target))
+        for direction in possible_directions:
+            target_pos = source.directional_offset(direction)
+            if (recall and self[target_pos].structure_type == type(Dropoff)) or not self[target_pos].is_occupied:
+                safe_directions.append(direction)
+
+        return safe_directions
+
+    def navigate(self, ship, directions):
         """
         Returns a singular safe move towards the destination.
 
@@ -156,13 +170,14 @@ class GameMap:
         """
         # No need to normalize destination, since get_unsafe_moves
         # does that
-        for direction in self.get_unsafe_moves(ship.position, destination):
+        if len(directions) == 0 or self[ship.position].halite_amount / constants.MOVE_COST_RATIO > ship.halite_amount:
+            return Direction.Still, ship.position
+        else:
+            direction = random.choice(directions)
+        for direction in directions:
             target_pos = ship.position.directional_offset(direction)
-            if not self[target_pos].is_occupied:
-                self[target_pos].mark_unsafe(ship)
-                return direction
-
-        return Direction.Still
+            self[target_pos].mark_unsafe(ship)
+            return direction,target_pos
 
     @staticmethod
     def _generate():
