@@ -32,6 +32,15 @@ logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
 
 """ <<<Game Loop>>> """
 
+EXPERIMENT_ID = 0
+def create_experiment(message):
+    EXPERIMENT_ID = EXPERIMENT_ID - 1
+
+    if constants.DEBUG:
+        logging.INFO(f'creating experiemnt "{message}" with id = {EXPERIMENT_ID}')
+
+    return EXPERIMENT_ID
+
 def push_decision(ship, directions):
     global command_queue
     global game_map
@@ -52,14 +61,15 @@ def chose_random_move(ship, directions):
 
     push_decision(ship, directions)
 
-def greedy_chose_smallest_square_move(ship, moves):
+def greedy_chose_square_move(ship, moves):
     global command_queue
     global game_map
 
     if len(moves) == 0:
         moves.append(Direction.Still)
 
-    chosen_direction = sorted(moves, key=lambda move: game_map[ship.position.directional_offset(move)].halite_amount, reverse=True)[0]
+    sorted_moves = sorted(moves, key=lambda move: game_map[ship.position.directional_offset(move)].halite_amount)
+    chosen_direction = sorted_moves[0]
     push_decision(ship, [chosen_direction])
 
 def is_time_to_recall(ship):
@@ -67,11 +77,11 @@ def is_time_to_recall(ship):
 
     return constants.MAX_TURNS - game.turn_number - 5 <= game_map.calculate_distance(ship.position,  me.shipyard.position)
 
-def go_to_point_fast(ship, target, recall):
+def go_to_point_fast(ship, target, recall=False):
     global game_map
 
     moves = game_map.get_safe_moves(source=ship.position, target=target, recall=recall)
-    greedy_chose_smallest_square_move(ship, moves)
+    greedy_chose_square_move(ship, moves)
 
 def go_home(ship, recall=False):
     go_to_point_fast(ship, me.shipyard.position, recall)
@@ -95,8 +105,8 @@ def exclude_going_closer(position, safe_moves, dst):
 
 
 # def time_needed_to_go(src, dst, halite_amount):
-
-
+#     exp = create_experiment(f'time needed to go src={str(src)} dst={str(dst)} halite={str(halite_amount)}')
+#     ship = Ship(exp, exp, src, halite_amount)
 
 STATE_is_going_home = {}
 
