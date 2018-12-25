@@ -100,7 +100,7 @@ class Ship(Entity):
 
         # Check storage to see if ship already exists
         # If the ship exists, update its position and halite
-        if ship_id in Ship.__ships.keys():    
+        if ship_id in Ship.__ships.keys():
             old_ship = Ship.__ships[ship_id]
             old_ship.position = Position(x_position, y_position)
             old_ship.halite_amount = halite
@@ -112,7 +112,4 @@ class Ship(Entity):
             return ship_id, new_ship
 
     def __repr__(self):
-        return "{}(id={}, {}, cargo={} halite)".format(self.__class__.__name__,
-                                                       self.id,
-                                                       self.position,
-                                                       self.halite_amount)
+        return f'{self.__class__.__name__}(owner={self.owner}, id={self.id}, position={self.position}, halite_amount={self.halite_amount})'
