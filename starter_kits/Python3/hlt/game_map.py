@@ -148,7 +148,7 @@ class GameMap:
                                   else Direction.invert(y_cardinality))
         return possible_moves
 
-    def get_safe_moves(self, source, target=None, recall=False, possible_directions=set([Direction.North, Direction.South, Direction.East, Direction.West, Direction.Still])):
+    def get_safe_moves(self, source, target=None, recall=False, possible_directions=set(Direction.get_all_moves())):
         safe_directions = []
         if target is not None:
             possible_directions = possible_directions & set(self._get_unsafe_moves(source, target))
