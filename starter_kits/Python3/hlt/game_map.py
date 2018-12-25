@@ -6,6 +6,7 @@ from .entity import Entity, Shipyard, Ship, Dropoff
 from .player import Player
 from .positionals import Direction, Position
 from .common import read_input
+import logging
 
 
 class MapCell:
@@ -147,15 +148,13 @@ class GameMap:
                                   else Direction.invert(y_cardinality))
         return possible_moves
 
-    def get_safe_moves(self, source, target=None, recall=False, direction_candidates=set([Direction.North, Direction.South, Direction.East, Direction.West, Direction.Still])):
+    def get_safe_moves(self, source, target=None, recall=False, possible_directions=set([Direction.North, Direction.South, Direction.East, Direction.West, Direction.Still])):
         safe_directions = []
-
-        possible_directions = direction_candidates
         if target is not None:
             possible_directions = possible_directions & set(self._get_unsafe_moves(source, target))
         for direction in possible_directions:
             target_pos = source.directional_offset(direction)
-            if (recall and self[target_pos].structure_type == type(Dropoff)) or not self[target_pos].is_occupied:
+            if (recall and self[target_pos].structure_type in (type(Shipyard(0,0,0)), type(Dropoff(0,0,0)))) or not self[target_pos].is_occupied:
                 safe_directions.append(direction)
 
         return safe_directions
@@ -171,13 +170,13 @@ class GameMap:
         # No need to normalize destination, since get_unsafe_moves
         # does that
         if len(directions) == 0 or self[ship.position].halite_amount / constants.MOVE_COST_RATIO > ship.halite_amount:
-            return Direction.Still, ship.position
+            direction =  Direction.Still
         else:
             direction = random.choice(directions)
-        for direction in directions:
-            target_pos = ship.position.directional_offset(direction)
-            self[target_pos].mark_unsafe(ship)
-            return direction,target_pos
+
+        target_pos = ship.position.directional_offset(direction)
+        self[target_pos].mark_unsafe(ship)
+        return direction,target_pos
 
     @staticmethod
     def _generate():

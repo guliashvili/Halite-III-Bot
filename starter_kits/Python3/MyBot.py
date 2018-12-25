@@ -124,7 +124,7 @@ while True:
             STATE_is_going_home[ship.id] = True
             go_home_full(ship)
         elif can_move(ship) and (ship.halite_amount >= game_map[ship.position].halite_amount < constants.MAX_HALITE / 10 or ship.is_full):
-            safe_moves = game_map.get_safe_moves(source=ship.position, direction_candidates=Direction.get_all_cardinals())
+            safe_moves = game_map.get_safe_moves(source=ship.position, possible_directions=Direction.get_all_cardinals())
             run_far_moves = exclude_going_closer(ship.position, safe_moves, me.shipyard.position)
             chose_random_move(ship, run_far_moves)
         else:
