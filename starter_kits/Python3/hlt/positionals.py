@@ -22,6 +22,10 @@ class Direction:
         return [Direction.North, Direction.South, Direction.East, Direction.West]
 
     @staticmethod
+    def get_all_moves():
+        return Direction.get_all_cardinals() + [Direction.Still]
+
+    @staticmethod
     def convert(direction):
         """
         Converts from this direction tuple notation to the engine's string notation
