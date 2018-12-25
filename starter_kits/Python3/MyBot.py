@@ -77,6 +77,23 @@ def is_time_to_recall(ship):
 
     return constants.MAX_TURNS - game.turn_number - 5 <= game_map.calculate_distance(ship.position,  me.shipyard.position)
 
+def moves_closer(position, dst):
+    global game_map
+
+    current_distance = game_map.calculate_distance(position, dst)
+    return [move for move in Direction.get_all_moves() if game_map.calculate_distance(position.directional_offset(move), dst) < current_distance]
+
+
+def go_to_point_dp(ship, target, recall=False):
+    global game_map
+
+    dp = {}
+    moves_closer = set()
+    moves = game_map.get_safe_moves(source=ship.position, target=target, recall=recall)
+    for move in moves:
+        dp[ship.position.directional_offset(move)]
+
+
 def go_to_point_fast(ship, target, recall=False):
     global game_map
 
@@ -101,8 +118,7 @@ def exclude_going_closer(position, safe_moves, dst):
     current_distance = game_map.calculate_distance(position, dst)
     if current_distance < 3 + game.turn_number/10:
         return safe_moves
-    return [move for move in safe_moves if game_map.calculate_distance(position.directional_offset(move), dst) >= current_distance]
-
+    return list(set(safe_moves) - set(moves_closer(position, dst)))
 
 # def time_needed_to_go(src, dst, halite_amount):
 #     exp = create_experiment(f'time needed to go src={str(src)} dst={str(dst)} halite={str(halite_amount)}')
