@@ -8,7 +8,7 @@ import hlt
 from hlt import constants
 
 # This library contains direction metadata to better interface with the game.
-from hlt.positionals import Direction
+from hlt.positionals import Direction, Position
 
 # This library allows you to generate random numbers.
 import random
@@ -79,7 +79,7 @@ def is_time_to_recall(ship):
     return constants.MAX_TURNS - game.turn_number - 5 <= game_map.calculate_distance(ship.position,  me.shipyard.position)
 
 _ONCE_INIT = (None, None, -1)
-dp = [[[_ONCE_INIT for _y in range(64)] for _x in range(64)] for _turn in range(2+int((65+65)*1.5))]
+dp = [[[_ONCE_INIT for _y in range(constants.HEIGHT)] for _x in range(constants.WIDTH)] for _turn in range(2+int((constants.HEIGHT+constants.WIDTH)*1.5))]
 MARK = 1
 
 def get_dp(turn, position):
@@ -222,10 +222,11 @@ def exclude_going_closer(position, safe_moves, dst):
 GO_HOME_RECALL = 0
 GO_HOME_EFFICIENT = 1
 NUM_OF_MOVES_FROM_HOME = 2
+# GO_TO_POIINT = 3
 ship_STATE = []
 
 def init_state():
-    return [False, False,0]
+    return [False, False, 0, None]
 
 def get_state(ship, quest):
     return ship_STATE[ship.id][quest]
@@ -233,6 +234,52 @@ def get_state(ship, quest):
 def set_state(ship, quest, value):
     ship_STATE[ship.id][quest] = value
 
+points_in_use = set()
+ship_pair_used = [[-1 for _y in range(constants.HEIGHT)] for _x in range(constants.WIDTH)]
+
+def pair_ships(ships):
+    global game_map
+    global MARK
+
+    MARK += 1
+    ship_candidates = []
+    ship_satisfied = [False for _ in range(len(ships))]
+    for x in range(constants.WIDTH):
+        for y in range(constants.HEIGHT):
+            target = Position(x, y, False)
+            target_halite_amount = game_map[target].halite_amount
+            if target_halite_amount//constants.EXTRACT_RATIO < 10:
+                continue
+
+            for i in range(len(ships)):
+                ship = ships[i]
+
+                distance = game_map.calculate_distance(ship.position, target) * 1.0
+                ship_candidates.append((i, target, min(constants.MAX_HALITE - ship.halite_amount, target_halite_amount) / (distance+1)))
+
+
+    for i, target, efficiency in sorted(ship_candidates, key=lambda arg: arg[2], reverse=True):
+
+        if ship_satisfied[i] == True:
+            continue
+        if ship_pair_used[target.x][target.y] == MARK:
+            continue
+        # f.write(f'{str(i)} {str(target)} {str(efficiency)}\n')
+        ship = ships[i]
+        safe_moves = game_map.get_safe_moves(ship.position, target)
+        if len(safe_moves) == 0 and target != ship.position:
+            continue
+        ship_pair_used[target.x][target.y] = MARK
+        ship_satisfied[i] = True
+        push_decision(ship, safe_moves)
+    #f.write('\n\n')
+
+    for i in range(len(ship_satisfied)):
+        if ship_satisfied[i] == False:
+            ship = ships[i]
+
+            logging.info(f'Failed to satisfy {str(ships[i])}')
+            push_decision(ship, [Direction.Still])
 
 
 while True:
@@ -246,7 +293,7 @@ while True:
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
     command_queue = []
-
+    looking_for_point = []
     for ship in sorted(me.get_ships(), key=lambda x: x.halite_amount, reverse=True):
         while ship.id >= len(ship_STATE):
             ship_STATE.append(init_state())
@@ -264,13 +311,14 @@ while True:
         elif get_state(ship, GO_HOME_EFFICIENT) or ship.halite_amount >= constants.MAX_HALITE * 90/100:
             set_state(ship, GO_HOME_EFFICIENT, True)
             go_home_efficient(ship)
-        elif can_move(ship) and (ship.halite_amount >= game_map[ship.position].halite_amount < constants.MAX_HALITE / 10 or ship.is_full):
-            safe_moves = game_map.get_safe_moves(source=ship.position, possible_directions=Direction.get_all_cardinals())
-            run_far_moves = exclude_going_closer(ship.position, safe_moves, me.shipyard.position)
-            chose_random_move(ship, run_far_moves)
-        else:
+        elif not can_move(ship):
             push_decision(ship, [Direction.Still])
+        else:
+            looking_for_point.append(ship)
+
         set_state(ship, NUM_OF_MOVES_FROM_HOME, get_state(ship, NUM_OF_MOVES_FROM_HOME) + 1)
+
+    pair_ships(looking_for_point)
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
