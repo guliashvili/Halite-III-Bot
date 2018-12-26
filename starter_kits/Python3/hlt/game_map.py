@@ -175,7 +175,9 @@ class GameMap:
             direction = random.choice(directions)
 
         target_pos = ship.position.directional_offset(direction)
-        self[target_pos].mark_unsafe(ship)
+        if direction != Direction.Still:
+            self[target_pos].mark_unsafe(ship)
+            self[ship.position].mark_unsafe(None) # Mark safe
         return direction,target_pos
 
     _drop_place_types = (type(Shipyard(0,0,0)), type(Dropoff(0,0,0)))
