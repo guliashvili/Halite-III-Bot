@@ -294,6 +294,7 @@ while True:
     #   end of the turn.
     command_queue = []
     looking_for_point = []
+    ready_to_go_home_ships = []
     for ship in sorted(me.get_ships(), key=lambda x: x.halite_amount, reverse=True):
         while ship.id >= len(ship_STATE):
             ship_STATE.append(init_state())
@@ -309,8 +310,7 @@ while True:
             set_state(ship, GO_HOME_RECALL, True)
             go_home_fast(ship, True)
         elif get_state(ship, GO_HOME_EFFICIENT) or ship.halite_amount >= constants.MAX_HALITE * 90/100:
-            set_state(ship, GO_HOME_EFFICIENT, True)
-            go_home_efficient(ship)
+            ready_to_go_home_ships.append(ship)
         elif not can_move(ship):
             push_decision(ship, [Direction.Still])
         else:
@@ -319,6 +319,9 @@ while True:
         set_state(ship, NUM_OF_MOVES_FROM_HOME, get_state(ship, NUM_OF_MOVES_FROM_HOME) + 1)
 
     pair_ships(looking_for_point)
+    for ship in ready_to_go_home_ships:
+        set_state(ship, GO_HOME_EFFICIENT, True)
+        go_home_efficient(ship)
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
