@@ -148,13 +148,13 @@ class GameMap:
                                   else Direction.invert(y_cardinality))
         return possible_moves
 
-    def get_safe_moves(self, source, target=None, recall=False, possible_directions=set(Direction.get_all_moves())):
+    def get_safe_moves(self, source, target=None, recall=False, possible_directions=set(Direction.get_all_cardinals())):
         safe_directions = []
         if target is not None:
             possible_directions = set(possible_directions) & set(self.get_unsafe_moves(source, target))
         for direction in possible_directions:
             target_pos = source.directional_offset(direction)
-            if (recall and self[target_pos].structure_type in (type(Shipyard(0,0,0)), type(Dropoff(0,0,0)))) or not self[target_pos].is_occupied:
+            if (recall and self.is_drop_place(self[target_pos])) or direction == Direction.Still or not self[target_pos].is_occupied:
                 safe_directions.append(direction)
 
         return safe_directions
@@ -177,6 +177,10 @@ class GameMap:
         target_pos = ship.position.directional_offset(direction)
         self[target_pos].mark_unsafe(ship)
         return direction,target_pos
+
+    _drop_place_types = (type(Shipyard(0,0,0)), type(Dropoff(0,0,0)))
+    def is_drop_place(self, cell):
+        return cell.structure_type in self._drop_place_types
 
     @staticmethod
     def _generate():
