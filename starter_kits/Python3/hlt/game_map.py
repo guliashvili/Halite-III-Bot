@@ -125,7 +125,7 @@ class GameMap:
         return (Direction.South if target.y > source.y else Direction.North if target.y < source.y else None,
                 Direction.East if target.x > source.x else Direction.West if target.x < source.x else None)
 
-    def _get_unsafe_moves(self, source, destination):
+    def get_unsafe_moves(self, source, destination):
         """
         Return the Direction(s) to move closer to the target point, or empty if the points are the same.
         This move mechanic does not account for collisions. The multiple directions are if both directional movements
@@ -151,7 +151,7 @@ class GameMap:
     def get_safe_moves(self, source, target=None, recall=False, possible_directions=set(Direction.get_all_moves())):
         safe_directions = []
         if target is not None:
-            possible_directions = possible_directions & set(self._get_unsafe_moves(source, target))
+            possible_directions = set(possible_directions) & set(self.get_unsafe_moves(source, target))
         for direction in possible_directions:
             target_pos = source.directional_offset(direction)
             if (recall and self[target_pos].structure_type in (type(Shipyard(0,0,0)), type(Dropoff(0,0,0)))) or not self[target_pos].is_occupied:

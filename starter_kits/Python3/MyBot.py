@@ -45,6 +45,7 @@ def push_decision(ship, directions):
     global command_queue
     global game_map
 
+    directions = list(filter(None, directions))
     direction, next_position = game_map.navigate(ship, directions)
     command_queue.append(ship.move(direction))
 
@@ -77,28 +78,81 @@ def is_time_to_recall(ship):
 
     return constants.MAX_TURNS - game.turn_number - 5 <= game_map.calculate_distance(ship.position,  me.shipyard.position)
 
-def moves_closer(position, dst):
+def compute_dp(ship, target, recall=False):
     global game_map
 
-    current_distance = game_map.calculate_distance(position, dst)
-    return [move for move in Direction.get_all_moves() if game_map.calculate_distance(position.directional_offset(move), dst) < current_distance]
+    dp = [{} for _ in range(1 + game_map.calculate_distance(ship.position, target)*2)]
 
+    moves_closer = game_map.get_unsafe_moves(ship.position, target)
 
-def go_to_point_dp(ship, target, recall=False):
-    global game_map
+    y_move = Direction.North
+    x_move = Direction.East
+    if Direction.South in moves_closer:
+        y_move = Direction.South
+    if Direction.West in moves_closer:
+        x_move = Direction.West
 
-    dp = {}
-    moves_closer = set()
-    moves = game_map.get_safe_moves(source=ship.position, target=target, recall=recall)
-    for move in moves:
-        dp[ship.position.directional_offset(move)]
+    dp[0][ship.position] = (ship.halite_amount, None)
+
+    for cur_turn in range(len(dp)):
+        cur_edge_position = ship.position
+        while True: # X
+            cur_position = cur_edge_position
+            while True: # y
+                if cur_position in dp[cur_turn]:
+                    if cur_position == ship.position:
+                        moves = game_map.get_safe_moves(source=ship.position, target=target, recall=recall)
+                    else:
+                        moves = game_map.get_unsafe_moves(cur_position, target)
+
+                    for move in moves:
+                        target = cur_position.directional_offset(move)
+                        cur_halite = dp[cur_turn][cur_position][0]
+                        halite_to_grab = game_map[cur_position].halite_amount
+
+                        def dp_update():
+                            halite_left = cur_halite - halite_to_grab/constants.MOVE_COST_RATIO
+                            if halite_left > 0:
+                                next_turn = cur_turn + stay_turns + 1
+                                if next_turn < len(dp) and (target not in dp[next_turn] or dp[next_turn][target][0] < halite_left):
+                                    move_to_set = dp[cur_turn][cur_position][1]
+                                    if move_to_set is None:
+                                        if stay_turns > 0:
+                                            move_to_set = Direction.Still
+                                        else:
+                                            move_to_set = move
+                                    dp[next_turn][target] = (halite_left, move_to_set)
+
+                        stay_turns = 0
+                        while True:
+                            dp_update()
+
+                            if halite_to_grab/constants.MOVE_COST_RATIO == 0:
+                                break
+
+                            stay_turns += 1
+                            cur_halite += halite_to_grab/constants.EXTRACT_RATIO
+                            halite_to_grab -= halite_to_grab/constants.EXTRACT_RATIO
+
+                if cur_position.y == target.y:
+                    break
+                cur_position = cur_position.directional_offset(y_move)
+
+            if cur_edge_position.x == target.x:
+                break
+            cur_edge_position = cur_edge_position.directional_offset(x_move)
+
+    return [(num_turn, dp[num_turn][target][1], dp[num_turn][target][0]) for num_turn in range(len(dp)) if target in dp[num_turn]]
 
 
 def go_to_point_fast(ship, target, recall=False):
     global game_map
 
-    moves = game_map.get_safe_moves(source=ship.position, target=target, recall=recall)
-    greedy_chose_square_move(ship, moves)
+    num_turn_and_dir = compute_dp(ship, target, recall)
+    if len(num_turn_and_dir) == 0:
+        push_decision(ship, [Direction.Still])
+    else:
+        push_decision(ship, [num_turn_and_dir[0][1]])
 
 def go_home(ship, recall=False):
     go_to_point_fast(ship, me.shipyard.position, recall)
@@ -106,10 +160,16 @@ def go_home(ship, recall=False):
 def go_home_full(ship):
     global game_map
 
-    if ship.halite_amount < 900 and game_map[ship.position].halite_amount > 30:
+    num_turn_and_dir = compute_dp(ship,  me.shipyard.position)
+    if len(num_turn_and_dir) == 0:
         push_decision(ship, [Direction.Still])
     else:
-        go_home(ship)
+        best = None
+        for num_turn, direction, halite in num_turn_and_dir:
+            cur = (halite*1.0/num_turn, direction)
+            if best is None or cur > best:
+                best = cur
+        push_decision(ship, [best[1]])
 
 def exclude_going_closer(position, safe_moves, dst):
     global game_map
@@ -118,11 +178,7 @@ def exclude_going_closer(position, safe_moves, dst):
     current_distance = game_map.calculate_distance(position, dst)
     if current_distance < 3 + game.turn_number/10:
         return safe_moves
-    return list(set(safe_moves) - set(moves_closer(position, dst)))
-
-# def time_needed_to_go(src, dst, halite_amount):
-#     exp = create_experiment(f'time needed to go src={str(src)} dst={str(dst)} halite={str(halite_amount)}')
-#     ship = Ship(exp, exp, src, halite_amount)
+    return list(set(safe_moves) - set(game_map.get_unsafe_moves(position, dst)))
 
 STATE_is_going_home = {}
 
