@@ -182,7 +182,7 @@ class GameMap:
 
     _drop_place_types = (type(Shipyard(0,0,0)), type(Dropoff(0,0,0)))
     def is_drop_place(self, cell):
-        return cell.structure_type in self._drop_place_types
+        return cell.structure_type is not None
 
     @staticmethod
     def _generate():

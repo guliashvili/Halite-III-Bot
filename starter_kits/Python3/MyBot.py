@@ -3,7 +3,7 @@
 
 # Import the Halite SDK, which will let you interact with the game.
 import hlt
-
+import os
 # This library contains constant values.
 from hlt import constants
 
@@ -12,6 +12,8 @@ from hlt.positionals import Direction, Position
 
 # This library allows you to generate random numbers.
 import random
+
+from hlt.commands import CONSTRUCT
 
 # Logging allows you to save messages for yourself. This is required because the regular STDOUT
 #   (print statements) are reserved for the engine-bot communication.
@@ -26,57 +28,79 @@ game = hlt.Game()
 # As soon as you call "ready" function below, the 2 second per turn timer will start.
 game.ready("MyPythonBot")
 
+# create file handler which logs even debug messages
+_fh = logging.FileHandler(f'guru99-{game.my_id}.log')
+_fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(levelname)s-%(funcName)s- %(message)s')
+_fh.setFormatter(formatter)
+logger = logging.getLogger('')
+logger.setLevel(logging.INFO)
+logger.addHandler(_fh)
+
 # Now that your bot is initialized, save a message to yourself in the log file with some important information.
 #   Here, you log here your id, which you can always fetch from the game object by using my_id.
-logging.info("Successfully created bot! My Player ID is {}.".format(game.my_id))
+logger.warn("Successfully created bot! My Player ID is {}.".format(game.my_id))
 
 """ <<<Game Loop>>> """
 
-EXPERIMENT_ID = 0
-def create_experiment(message):
-    EXPERIMENT_ID = EXPERIMENT_ID - 1
+# EXPERIMENT_ID = 0
+# def create_experiment(message):
+#     EXPERIMENT_ID = EXPERIMENT_ID - 1
+#
+#     if constants.DEBUG:
+#         logger.warn(f'creating experiemnt "{message}" with id = {EXPERIMENT_ID}')
+#
+#     return EXPERIMENT_ID
 
-    if constants.DEBUG:
-        logging.INFO(f'creating experiemnt "{message}" with id = {EXPERIMENT_ID}')
-
-    return EXPERIMENT_ID
+_DROPOFFS = None
+def get_dropoffs():
+    return _DROPOFFS
 
 def push_decision(ship, directions):
     global command_queue
     global game_map
 
-    directions = list(filter(None, directions))
-    direction, next_position = game_map.navigate(ship, directions)
-    command_queue.append(ship.move(direction))
+    if directions == CONSTRUCT:
+        logger.info(f'CONSTRUCT - {ship}; turn={game.turn_number}')
+        command_queue.append(ship.make_dropoff())
+    else:
+        directions = list(filter(None, directions))
+        direction, next_position = game_map.navigate(ship, directions)
+        logger.info(f'NORMAL - {ship}; direction = {direction}; next_position={next_position}; turn={game.turn_number}')
+        command_queue.append(ship.move(direction))
 
 def can_move(ship):
     global game_map
 
     if ship.halite_amount >= game_map[ship.position].halite_amount * 10 // 100:
+        logger.debug(f'{ship} can move; turn={game.turn_number}')
         return True
     else:
+        logger.debug(f'{ship} can not move; turn={game.turn_number}')
         return False
 
 def chose_random_move(ship, directions):
-    global command_queu
-
     push_decision(ship, directions)
 
-def greedy_chose_square_move(ship, moves):
+def greedy_chose_square_move(ship, moves):  # TODO use
     global command_queue
     global game_map
 
     if len(moves) == 0:
+        logger.debug(f'{ship} had no moves, stay; turn={game.turn_number}')
         moves.append(Direction.Still)
 
     sorted_moves = sorted(moves, key=lambda move: game_map[ship.position.directional_offset(move)].halite_amount)
     chosen_direction = sorted_moves[0]
+    logger.debug(f'{ship} chose move {chosen_direction}; turn={game.turn_number}')
     push_decision(ship, [chosen_direction])
 
 def is_time_to_recall(ship):
     global game_map
-
-    return constants.MAX_TURNS - game.turn_number - 5 <= game_map.calculate_distance(ship.position,  me.shipyard.position)
+    is_it = constants.MAX_TURNS - game.turn_number - 5 <= min([game_map.calculate_distance(ship.position,  target) for target in get_dropoffs()])
+    if is_it:
+        logger.info(f'{ship}  is_it={is_it}; turn={game.turn_number}')
+    return is_it
 
 _ONCE_INIT = (None, None, -1)
 dp = [[[_ONCE_INIT for _y in range(constants.HEIGHT)] for _x in range(constants.WIDTH)] for _turn in range(2+int((constants.HEIGHT+constants.WIDTH)*1.5))]
@@ -91,9 +115,11 @@ def get_dp(turn, position):
 def set_dp(turn, position, value):
     dp[turn][position.x][position.y] = value
 
-def compute_dp(ship, target, recall=False):
+def compute_dp(ship, targets, recall=False):
     global game_map
     global MARK
+
+    target = sorted(targets, key=lambda x: game_map.calculate_distance(ship.position, x))[0]
 
     MARK += 1
 
@@ -108,8 +134,6 @@ def compute_dp(ship, target, recall=False):
     if Direction.West in moves_closer:
         x_move = Direction.West
 
-    # if game_map.calculate_distance(ship.position, target) > 5:
-    #     f.write('GIVI\n' + str(ship) + '\n' + str(target) + '\n'+ str(dp) + '\n')
     set_dp(0, ship.position, (ship.halite_amount, None, MARK))
 
     for cur_turn in range(len_dp):
@@ -123,8 +147,6 @@ def compute_dp(ship, target, recall=False):
                     if was_not_none:
                         break
                 else:
-                    # if was_not_none==True:
-                    #     f.write(f'GIO {str(was_not_none)} {str(ship)} {str(target)} {str(cur_position)} {str(cur_dp_state)}\n')
                     was_not_none = True
                     if cur_position == ship.position:
                         moves = game_map.get_safe_moves(source=ship.position, target=target, recall=recall)
@@ -155,7 +177,7 @@ def compute_dp(ship, target, recall=False):
                         while True:
                             dp_update()
 
-                            if cur_halite == constants.MAX_HALITE or halite_to_grab//constants.MOVE_COST_RATIO < 10:
+                            if cur_halite == constants.MAX_HALITE or halite_to_grab//constants.MOVE_COST_RATIO < 5:
                                 break
 
                             stay_turns += 1
@@ -171,32 +193,34 @@ def compute_dp(ship, target, recall=False):
                 break
             cur_edge_position = cur_edge_position.directional_offset(x_move)
 
-    # if game_map.calculate_distance(ship.position, target) > 5:
-    #     f.write('GIVI\n' + str(ship) + '\n' + str(target) + '\n'+ str(dp) + '\n')
-    #     return 1/0
     return [(num_turn, dp[num_turn][target.x][target.y][1], dp[num_turn][target.x][target.y][0]) for num_turn in range(len_dp) if dp[num_turn][target.x][target.y][2] == MARK]
 
 
-def go_to_point_fast(ship, target, recall=False):
+def go_to_point_fast(ship, targets, recall=False):
     global game_map
 
-    num_turn_and_dir = compute_dp(ship, target, recall)
-    #f.write(f'GIVI {str(ship)} {str(target)} {str(num_turn_and_dir)} \n')
+    num_turn_and_dir = compute_dp(ship, targets, recall)
+    logger.debug(f'dp_results= {num_turn_and_dir}; turn={game.turn_number}')
     if len(num_turn_and_dir) == 0:
+        logger.info(f'{ship}  targets={targets}; recall={recall} stay still, meh; turn={game.turn_number}')
         push_decision(ship, [Direction.Still])
     else:
+        logger.info(f'{ship}  targets={targets}; recall={recall} go_to={num_turn_and_dir[0][1]}; turn={game.turn_number}')
         push_decision(ship, [num_turn_and_dir[0][1]])
 
 def go_home_fast(ship, recall=False):
-    go_to_point_fast(ship, me.shipyard.position, recall)
-# f = open("guru99.txt","w+")
-def go_to_point_efficient(ship, target, recall=False):
+    targets = get_dropoffs()
+    logger.info(f'{ship} recall={recall} targets={targets}; turn={game.turn_number}')
+    go_to_point_fast(ship, targets, recall)
+
+def go_to_point_efficient(ship, targets, recall=False):
     global game_map
 
-    num_turn_and_dir = compute_dp(ship, target, recall)
+    num_turn_and_dir = compute_dp(ship, targets, recall)
+    logger.debug(f'dp_results= {num_turn_and_dir}; turn={game.turn_number}')
 
-    # f.write(str(ship) + " " +  str(num_turn_and_dir) + '\n')
     if len(num_turn_and_dir) == 0:
+        logger.info(f'{ship} recall={recall} targets={targets}; turn={game.turn_number} stay_still_point')
         push_decision(ship, [Direction.Still])
     else:
         best = None
@@ -204,34 +228,36 @@ def go_to_point_efficient(ship, target, recall=False):
             cur = (halite*1.0/(get_state(ship, NUM_OF_MOVES_FROM_HOME) + num_turn), direction)
             if best is None or cur > best:
                 best = cur
-        # f.write(str(ship) + " " + str(best[1]) + " " + str(num_turn_and_dir))
+        logger.info(f'{ship} recall={recall} targets={targets}; best={best}; turn={game.turn_number}')
         push_decision(ship, [best[1]])
 
 def go_home_efficient(ship, recall=False):
-    go_to_point_efficient(ship, me.shipyard.position, recall)
-
-def exclude_going_closer(position, safe_moves, dst):
-    global game_map
-    global game
-
-    current_distance = game_map.calculate_distance(position, dst)
-    if current_distance < 3 + game.turn_number/10:
-        return safe_moves
-    return list(set(safe_moves) - set(game_map.get_unsafe_moves(position, dst)))
+    targets = get_dropoffs()
+    logger.info(f'{ship} recall={recall} targets={targets}; turn={game.turn_number}')
+    go_to_point_efficient(ship, targets, recall)
 
 GO_HOME_RECALL = 0
 GO_HOME_EFFICIENT = 1
 NUM_OF_MOVES_FROM_HOME = 2
-# GO_TO_POIINT = 3
+DROPOFF_SHIP = 3
 ship_STATE = []
 
 def init_state():
     return [False, False, 0, None]
 
 def get_state(ship, quest):
+    global ship_STATE
+
+    if ship_STATE[ship.id][quest] is not None:
+        logger.info(f'{ship} quest={quest} result={ship_STATE[ship.id][quest]}; turn={game.turn_number}')
+    else:
+        logger.debug(f'{ship} quest={quest} result={ship_STATE[ship.id][quest]}; turn={game.turn_number}')
     return ship_STATE[ship.id][quest]
 
 def set_state(ship, quest, value):
+    global ship_STATE
+
+    logger.info(f'{ship} quest={quest} value={value}; turn={game.turn_number}')
     ship_STATE[ship.id][quest] = value
 
 points_in_use = set()
@@ -254,7 +280,7 @@ def pair_ships(ships):
             for i in range(len(ships)):
                 ship = ships[i]
 
-                distance = game_map.calculate_distance(ship.position, target) * 1.0
+                distance = 1.0 + game_map.calculate_distance(ship.position, target) + min([game_map.calculate_distance(target, dropoff.position) for dropoff in [me.shipyard] + me.get_dropoffs()])
                 ship_candidates.append((i, target, min(constants.MAX_HALITE - ship.halite_amount, target_halite_amount) / (distance+1)))
 
 
@@ -264,7 +290,6 @@ def pair_ships(ships):
             continue
         if ship_pair_used[target.x][target.y] == MARK:
             continue
-        # f.write(f'{str(i)} {str(target)} {str(efficiency)}\n')
         ship = ships[i]
         safe_moves = game_map.get_safe_moves(ship.position, target)
         if len(safe_moves) == 0 and target != ship.position:
@@ -272,17 +297,78 @@ def pair_ships(ships):
         ship_pair_used[target.x][target.y] = MARK
         ship_satisfied[i] = True
         push_decision(ship, safe_moves)
-    #f.write('\n\n')
 
     for i in range(len(ship_satisfied)):
         if ship_satisfied[i] == False:
             ship = ships[i]
 
-            logging.info(f'Failed to satisfy {str(ships[i])}')
+            logger.warn(f'Failed to satisfy {str(ships[i])}')
             push_decision(ship, [Direction.Still])
 
+last_dropoff = 0
+def is_ready_for_dropoff():
+    global last_dropoff
 
+    if last_dropoff//15 < len(me.get_ships())//15:
+        logger.info(f'ready last = {last_dropoff} now = {len(me.get_ships())}; turn={game.turn_number}')
+        return True
+    else:
+        logger.debug(f'not ready last = {last_dropoff} now = {len(me.get_ships())}; turn={game.turn_number}')
+        return False
+
+def get_dropoff_efficiency(centre):
+    global game_map
+
+    value = 0
+    for x in range(constants.WIDTH):
+        for y in range(constants.HEIGHT):
+            position = Position(x, y, False)
+            cell = game_map[position]
+            distance = game_map.calculate_distance(centre, position) + 1.0
+
+            if cell.is_empty:
+                sub_value = cell.halite_amount
+            elif cell.has_structure:
+                sub_value = -1000
+            elif cell.is_occupied:
+                sub_value = -100
+
+            value += sub_value / distance
+
+    return value
+
+def find_best_cluster():
+    global game_map
+
+    candidates = []
+    for x in range(constants.WIDTH):
+        for y in range(constants.HEIGHT):
+            target = Position(x, y, False)
+            if not game_map[target].is_empty:
+                continue
+
+            square_sum = 0
+            for player in game.players.values():
+                mn = 999999
+                for item in player.get_dropoffs() + [player.shipyard]:
+                    mn = min(mn,  game_map.calculate_distance(target, item.position))
+                square_sum += mn * mn
+            candidates.append((target, square_sum))
+
+    candidates = [(target, get_dropoff_efficiency(target)) for target, _ in sorted(candidates, key=lambda x: x[1], reverse=True)[:30]]
+    return sorted(candidates, key=lambda x: x[1], reverse=True)[0][0]
+
+def send_for_dropoff(full_ships):
+    global game_map
+    if len(full_ships) == 0:
+        return None, None
+
+    target = find_best_cluster()
+    return sorted(full_ships, key=lambda ship: game_map.calculate_distance(target, ship.position))[0], target
+
+SAVINGS = 0
 while True:
+    logger.error('\n\n\n\n\n\n\n\n')
     # This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
     #   running update_frame().
     game.update_frame()
@@ -290,43 +376,88 @@ while True:
     me = game.me
     game_map = game.game_map
 
+    _DROPOFFS = (me.shipyard.position,) + tuple([dropoff.position for dropoff in me.get_dropoffs()])
+
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
     command_queue = []
     looking_for_point = []
     ready_to_go_home_ships = []
+
     for ship in sorted(me.get_ships(), key=lambda x: x.halite_amount, reverse=True):
+        logger.info(f'get_ship: turn={game.turn_number} {ship}')
         while ship.id >= len(ship_STATE):
             ship_STATE.append(init_state())
 
         # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
         #   Else, collect halite.
+        logger.info(f'is_drop_place {ship} structure_type={game_map[ship.position].structure_type}')
         if game_map.is_drop_place(game_map[ship.position]):
             #set_state(ship, GO_HOME_RECALL, False) let it stay there
             set_state(ship, GO_HOME_EFFICIENT, False)
             set_state(ship, NUM_OF_MOVES_FROM_HOME, 0)
+            logger.info(f'dropped_bag: {ship} turn={game.turn_number}')
 
-        if get_state(ship, GO_HOME_RECALL) or is_time_to_recall(ship):
-            set_state(ship, GO_HOME_RECALL, True)
-            go_home_fast(ship, True)
-        elif get_state(ship, GO_HOME_EFFICIENT) or ship.halite_amount >= constants.MAX_HALITE * 90/100:
-            ready_to_go_home_ships.append(ship)
-        elif not can_move(ship):
-            push_decision(ship, [Direction.Still])
+        if ship.position == get_state(ship, DROPOFF_SHIP):
+            if me.halite_amount >= constants.DROPOFF_COST:
+                SAVINGS -= constants.DROPOFF_COST
+                me.halite_amount -= constants.DROPOFF_COST
+                set_state(ship, DROPOFF_SHIP, None)
+                push_decision(ship, CONSTRUCT)
+                logger.info(f'dropoff_ship_constructed: {ship} turn={game.turn_number}')
+            else:
+                push_decision(ship, [Direction.Still])
+                logger.info(f'dropoff_ship_on_spot_poor: {ship} turn={game.turn_number}')
+
         else:
-            looking_for_point.append(ship)
+            if get_state(ship, DROPOFF_SHIP) is not None:
+                target = get_state(ship, DROPOFF_SHIP)
+                logger.info(f'dropoff_ship_going {ship} target={target} turn={game.turn_number}')
+                if not game_map[target].is_empty:
+                    set_state(ship, DROPOFF_SHIP, None)
+                    SAVINGS -= constants.DROPOFF_COST
+                    logger.info(f'dropoff_ship_reverted: {ship} savings={SAVINGS} turn={game.turn_number}')
+
+
+            if get_state(ship, DROPOFF_SHIP) is not None:
+                target = get_state(ship, DROPOFF_SHIP)
+                go_to_point_fast(ship, [target])
+                logger.info(f'dropoff_ship_going: {ship} target={target} turn={game.turn_number}')
+            elif get_state(ship, GO_HOME_RECALL) or is_time_to_recall(ship):
+                set_state(ship, GO_HOME_RECALL, True)
+                go_home_fast(ship, True)
+                logger.info(f'go_home_fast: {ship} turn={game.turn_number}')
+            elif get_state(ship, GO_HOME_EFFICIENT) or ship.halite_amount >= constants.MAX_HALITE * 90/100:
+                ready_to_go_home_ships.append(ship)
+                logger.info(f'go_home_efficient: {ship} turn={game.turn_number}')
+            elif not can_move(ship):
+                push_decision(ship, [Direction.Still])
+                logger.info(f'can_not_move: {ship} turn={game.turn_number}')
+            else:
+                looking_for_point.append(ship)
+                logger.info(f'looking_for_target: {ship} turn={game.turn_number}')
 
         set_state(ship, NUM_OF_MOVES_FROM_HOME, get_state(ship, NUM_OF_MOVES_FROM_HOME) + 1)
 
     pair_ships(looking_for_point)
+
+    if is_ready_for_dropoff():
+        SAVINGS += constants.DROPOFF_COST
+        dropoff_ship, dropoff_position = send_for_dropoff(ready_to_go_home_ships)
+        if dropoff_position is not None:
+            last_dropoff = len(me.get_ships())
+            set_state(dropoff_ship, DROPOFF_SHIP, dropoff_position)
+            go_to_point_fast(dropoff_ship, [dropoff_position])
+
     for ship in ready_to_go_home_ships:
-        set_state(ship, GO_HOME_EFFICIENT, True)
-        go_home_efficient(ship)
+        if get_state(ship, DROPOFF_SHIP) is None:
+            set_state(ship, GO_HOME_EFFICIENT, True)
+            go_home_efficient(ship)
 
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
 
-    if me.halite_amount >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied and game.turn_number <= 200:
+    if me.halite_amount - SAVINGS >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied and game.turn_number <= 200:
         command_queue.append(me.shipyard.spawn())
 
     # Send your moves back to the game environment, ending this turn.
