@@ -26,7 +26,7 @@ game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
 # As soon as you call "ready" function below, the 2 second per turn timer will start.
-game.ready("MyPythonBot")
+game.ready("MyPythonBot-32")
 
 # create file handler which logs even debug messages
 _fh = logging.FileHandler(f'guru99-{game.my_id}.log')

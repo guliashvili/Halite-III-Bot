@@ -154,7 +154,8 @@ class GameMap:
             possible_directions = set(possible_directions) & set(self.get_unsafe_moves(source, target))
         for direction in possible_directions:
             target_pos = source.directional_offset(direction)
-            if (recall and self.is_drop_place(self[target_pos])) or direction == Direction.Still or not self[target_pos].is_occupied:
+            target_cell = self[target_pos]
+            if (self.is_drop_place(target_cell) and target_cell.structure.owner != self[source].ship.owner) or (recall and self.is_drop_place(target_cell)) or direction == Direction.Still or not target_cell.is_occupied:
                 safe_directions.append(direction)
 
         return safe_directions
