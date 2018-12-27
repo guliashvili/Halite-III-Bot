@@ -75,6 +75,9 @@ class GameMap:
         self.height = height
         self._cells = cells
 
+    def init(self, owner):
+        self.owner = owner
+
     def __getitem__(self, location):
         """
         Getter for position object or entity objects within the game map
@@ -155,7 +158,7 @@ class GameMap:
         for direction in possible_directions:
             target_pos = source.directional_offset(direction)
             target_cell = self[target_pos]
-            if (self.is_drop_place(target_cell) and target_cell.structure.owner != self[source].ship.owner) or (recall and self.is_drop_place(target_cell)) or direction == Direction.Still or not target_cell.is_occupied:
+            if (self.is_drop_place(target_cell) and target_cell.structure.owner != self.owner) or (recall and self.is_drop_place(target_cell)) or direction == Direction.Still or not target_cell.is_occupied:
                 safe_directions.append(direction)
 
         return safe_directions
@@ -183,7 +186,7 @@ class GameMap:
 
     _drop_place_types = (type(Shipyard(0,0,0)), type(Dropoff(0,0,0)))
     def is_drop_place(self, cell):
-        return cell.structure_type is not None
+        return cell.structure_type is not None and cell.structure.owner == self.owner
 
     @staticmethod
     def _generate():

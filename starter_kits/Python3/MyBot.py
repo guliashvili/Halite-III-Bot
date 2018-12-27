@@ -177,7 +177,7 @@ def compute_dp(ship, targets, recall=False):
                         while True:
                             dp_update()
 
-                            if cur_halite == constants.MAX_HALITE or halite_to_grab//constants.MOVE_COST_RATIO < 5:
+                            if cur_halite == constants.MAX_HALITE or halite_to_grab//constants.MOVE_COST_RATIO < 10:
                                 break
 
                             stay_turns += 1
@@ -280,7 +280,7 @@ def pair_ships(ships):
             for i in range(len(ships)):
                 ship = ships[i]
 
-                distance = 1.0 + game_map.calculate_distance(ship.position, target) + min([game_map.calculate_distance(target, dropoff.position) for dropoff in [me.shipyard] + me.get_dropoffs()])
+                distance = 1.0 * game_map.calculate_distance(ship.position, target) #+ min([game_map.calculate_distance(target, dropoff.position) for dropoff in [me.shipyard] + me.get_dropoffs()])
                 ship_candidates.append((i, target, min(constants.MAX_HALITE - ship.halite_amount, target_halite_amount) / (distance+1)))
 
 
@@ -377,6 +377,7 @@ while True:
     game_map = game.game_map
 
     _DROPOFFS = (me.shipyard.position,) + tuple([dropoff.position for dropoff in me.get_dropoffs()])
+    game_map.init(me.shipyard.owner)
 
     # A command queue holds all the commands you will run this turn. You build this list up and submit it at the
     #   end of the turn.
