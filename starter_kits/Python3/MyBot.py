@@ -33,6 +33,8 @@ add_argument("TRAFFIC_CONTROLLER_DISTANCE_MARGIN", 0, 10, 5)
 add_argument("GREEDY_WALK_RANDOMISATION_MARGIN", 0, 50, 1)
 add_argument("MARGIN_TO_CREATE_NEW_SHIP", 500, 2000, 1000)
 add_argument("TOTAL_HALITE_MARGIN_SUBSTR", 10, 100, 24)
+add_argument("AVERAGE_TIME_HOME_DECAY", 0, 1, 1.0/3)
+add_argument("SHIP_SPAWN_STEP_MARGIN", 0, 200, 60)
 
 args = parser.parse_args()
 for gene_name, mn, mx in arguments_list:
@@ -419,6 +421,9 @@ def get_total_halite_amount_left():
 
     return total_halite
 
+
+AVERAGE_TIME_TO_HOME = 0
+
 def should_ship_new_ship():
     global game
     global me
@@ -436,7 +441,7 @@ def should_ship_new_ship():
     current_halite_prediction = total_halite * total_me / total_ships_count
     next_halite_prediction = total_halite * (total_me + 1) / (total_ships_count + 1)
 
-    return next_halite_prediction - current_halite_prediction >= GENES['MARGIN_TO_CREATE_NEW_SHIP']
+    return next_halite_prediction - current_halite_prediction >= GENES['MARGIN_TO_CREATE_NEW_SHIP'] and constants.MAX_TURNS - AVERAGE_TIME_TO_HOME > GENES["SHIP_SPAWN_STEP_MARGIN"]
 
 
 SAVINGS = 0
@@ -471,6 +476,7 @@ while True:
         if game_map.is_drop_place(game_map[ship.position]):
             #set_state(ship, GO_HOME_RECALL, False) let it stay there
             set_state(ship, GO_HOME_EFFICIENT, False)
+            AVERAGE_TIME_TO_HOME = AVERAGE_TIME_TO_HOME * GENES["AVERAGE_TIME_HOME_DECAY"] + get_state(ship, NUM_OF_MOVES_FROM_HOME) * (1-GENES["AVERAGE_TIME_HOME_DECAY"])
             set_state(ship, NUM_OF_MOVES_FROM_HOME, 0)
             #logger.info(f'dropped_bag: {ship} turn={game.turn_number}')
 
