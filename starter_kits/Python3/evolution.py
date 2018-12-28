@@ -88,7 +88,24 @@ def evaluateInd(tt):
         width = height = random.choice(SZ)
         seed = random.randint(a=1, b=99999999)
 
-        args = f'./halite --no-logs --no-replay --no-timeout --seed {seed} --width {width} --height {height} "python3 MyBot.py --EXTRA_TIME_FOR_RECALL {t1[0]} --TRAFFIC_CONTROLLER_DISTANCE_MARGIN {t1[1]} --SHIP_SHIPS_UNTIL_TURN {t1[2]} --GREEDY_WALK_RANDOMISATION_MARGIN {t1[3]}" "python3 MyBot.py --EXTRA_TIME_FOR_RECALL {t2[0]} --TRAFFIC_CONTROLLER_DISTANCE_MARGIN {t2[1]} --SHIP_SHIPS_UNTIL_TURN {t2[2]} --GREEDY_WALK_RANDOMISATION_MARGIN {t2[3]}"'
+        args = './halite --no-logs --no-replay --no-timeout '
+        args = args + f'--seed {seed} '
+        args = args + f'--width {width} --height {height} '
+        args = args + f'"python3 MyBot.py --EXTRA_TIME_FOR_RECALL {t1[0]} '
+        args = args + f'--TRAFFIC_CONTROLLER_DISTANCE_MARGIN {t1[1]} '
+        args = args + f'--GREEDY_WALK_RANDOMISATION_MARGIN {t1[2]} '
+        args = args + f'--MARGIN_TO_CREATE_NEW_SHIP {t1[3]} '
+        args = args + f'--TOTAL_HALITE_MARGIN_SUBSTR {t1[4]} '
+        args = args + f'--AVERAGE_TIME_HOME_DECAY {t1[5]} '
+        args = args + f'--SHIP_SPAWN_STEP_MARGIN {t1[6]}" '
+        args = args + f'"python3 MyBot.py --EXTRA_TIME_FOR_RECALL {t2[0]} '
+        args = args + f'--TRAFFIC_CONTROLLER_DISTANCE_MARGIN {t2[1]} '
+        args = args + f'--GREEDY_WALK_RANDOMISATION_MARGIN {t2[2]} '
+        args = args + f'--MARGIN_TO_CREATE_NEW_SHIP {t2[3]} '
+        args = args + f'--TOTAL_HALITE_MARGIN_SUBSTR {t2[4]} '
+        args = args + f'--AVERAGE_TIME_HOME_DECAY {t2[5]} '
+        args = args + f'--SHIP_SPAWN_STEP_MARGIN {t2[6]}" '
+
         save.append(args)
 
         st1 = "Player 0, 'MyPythonBot-32', was rank 1 with "
@@ -118,7 +135,7 @@ if __name__ == '__main__':
     creator.create("FitnessMax", base.Fitness, weights=(1.0,))
     creator.create("Individual", list, fitness=creator.FitnessMax)
 
-    IND_SIZE=4
+    IND_SIZE=7
 
     toolbox = base.Toolbox()
 
