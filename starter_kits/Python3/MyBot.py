@@ -191,7 +191,7 @@ def compute_dp(ship, targets, recall=False):
                         while True:
                             dp_update()
 
-                            if cur_halite == constants.MAX_HALITE or halite_to_grab//constants.MOVE_COST_RATIO < 10:
+                            if cur_halite == constants.MAX_HALITE or halite_to_grab//constants.EXTRACT_RATIO == 0:
                                 break
 
                             stay_turns += 1
@@ -288,7 +288,7 @@ def pair_ships(ships):
         for y in range(constants.HEIGHT):
             target = Position(x, y, False)
             target_halite_amount = game_map[target].halite_amount
-            if target_halite_amount//constants.EXTRACT_RATIO < 10:
+            if target_halite_amount//constants.EXTRACT_RATIO == 0:
                 continue
 
             for i in range(len(ships)):
