@@ -30,8 +30,9 @@ def add_argument(gene_name, mn, mx, default_value):
 
 add_argument("EXTRA_TIME_FOR_RECALL", 0, 10, 5)
 add_argument("TRAFFIC_CONTROLLER_DISTANCE_MARGIN", 0, 10, 5)
-add_argument("SHIP_SHIPS_UNTIL_TURN", 100, 300, 200)
 add_argument("GREEDY_WALK_RANDOMISATION_MARGIN", 0, 50, 1)
+add_argument("MARGIN_TO_CREATE_NEW_SHIP", 500, 2000, 1000)
+add_argument("TOTAL_HALITE_MARGIN_SUBSTR", 10, 100, 24)
 
 args = parser.parse_args()
 for gene_name, mn, mx in arguments_list:
@@ -408,6 +409,35 @@ def send_for_dropoff(full_ships):
     target = find_best_cluster()
     return sorted(full_ships, key=lambda ship: game_map.calculate_distance(target, ship.position))[0], target
 
+def get_total_halite_amount_left():
+    global game_map
+
+    total_halite = 0
+    for x in range(constants.WIDTH):
+        for y in range(constants.HEIGHT):
+            total_halite += max(0, game_map[Position(x, y, False)].halite_amount - GENES["TOTAL_HALITE_MARGIN_SUBSTR"])
+
+    return total_halite
+
+def should_ship_new_ship():
+    global game
+    global me
+
+    total_ships_count = 0
+    total_me = len(me.get_ships())
+    total_halite = get_total_halite_amount_left() * 1.0
+
+    for player in game.players.values():
+        total_ships_count += len(player.get_ships())
+
+    if total_ships_count == 0:
+        return True
+
+    current_halite_prediction = total_halite * total_me / total_ships_count
+    next_halite_prediction = total_halite * (total_me + 1) / (total_ships_count + 1)
+
+    return next_halite_prediction - current_halite_prediction >= GENES['MARGIN_TO_CREATE_NEW_SHIP']
+
 
 SAVINGS = 0
 TRAFFIC_CONTROLLER = None
@@ -503,7 +533,7 @@ while True:
     # If the game is in the first 200 turns and you have enough halite, spawn a ship.
     # Don't spawn a ship if you currently have a ship at port, though - the ships will collide.
 
-    if me.halite_amount - SAVINGS >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied and game.turn_number <= GENES["SHIP_SHIPS_UNTIL_TURN"]:
+    if me.halite_amount - SAVINGS >= constants.SHIP_COST and not game_map[me.shipyard].is_occupied and should_ship_new_ship():
         command_queue.append(me.shipyard.spawn())
 
     # Send your moves back to the game environment, ending this turn.
