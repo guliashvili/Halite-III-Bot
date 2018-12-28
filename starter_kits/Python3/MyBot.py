@@ -123,9 +123,22 @@ def compute_dp(ship, targets, recall=False):
 
     MARK += 1
 
-    len_dp = 2 + int(game_map.calculate_distance(ship.position, target)*1.5)
+    distance_to_target = game_map.calculate_distance(ship.position, target)
+    len_dp = 2 + int(distance_to_target*1.5)
+    moves_closer = tuple(game_map.get_unsafe_moves(ship.position, target))
 
-    moves_closer = game_map.get_unsafe_moves(ship.position, target)
+    if distance_to_target < 5 and len(moves_closer) == 1:
+        if target not in TRAFFIC_CONTROLLER:
+            TRAFFIC_CONTROLLER[target] = {}
+
+        if len(TRAFFIC_CONTROLLER[target]) == 4:
+            if TRAFFIC_CONTROLLER[target][moves_closer] == False:
+                return []
+        elif len(TRAFFIC_CONTROLLER[target]) == 3 and moves_closer not in TRAFFIC_CONTROLLER[target]:
+            TRAFFIC_CONTROLLER[target][moves_closer] = False
+            return []
+        else:
+            TRAFFIC_CONTROLLER[target][moves_closer] = True
 
     y_move = Direction.North
     x_move = Direction.East
@@ -308,6 +321,7 @@ def pair_ships(ships):
 last_dropoff = 0
 def is_ready_for_dropoff():
     global last_dropoff
+    return False
 
     if last_dropoff//15 < len(me.get_ships())//15:
         logger.info(f'ready last = {last_dropoff} now = {len(me.get_ships())}; turn={game.turn_number}')
@@ -367,7 +381,9 @@ def send_for_dropoff(full_ships):
     return sorted(full_ships, key=lambda ship: game_map.calculate_distance(target, ship.position))[0], target
 
 SAVINGS = 0
+TRAFFIC_CONTROLLER = None
 while True:
+    TRAFFIC_CONTROLLER = {}
     logger.error('\n\n\n\n\n\n\n\n')
     # This loop handles each turn of the game. The game object changes every turn, and you refresh that state by
     #   running update_frame().
