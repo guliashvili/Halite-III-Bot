@@ -127,18 +127,19 @@ def compute_dp(ship, targets, recall=False):
     len_dp = 2 + int(distance_to_target*1.5)
     moves_closer = tuple(game_map.get_unsafe_moves(ship.position, target))
 
-    if distance_to_target < 5 and len(moves_closer) == 1:
-        if target not in TRAFFIC_CONTROLLER:
-            TRAFFIC_CONTROLLER[target] = {}
+    if not recall:
+        if distance_to_target < 5 and len(moves_closer) == 1:
+            if target not in TRAFFIC_CONTROLLER:
+                TRAFFIC_CONTROLLER[target] = {}
 
-        if len(TRAFFIC_CONTROLLER[target]) == 4:
-            if TRAFFIC_CONTROLLER[target][moves_closer] == False:
+            if len(TRAFFIC_CONTROLLER[target]) == 4:
+                if TRAFFIC_CONTROLLER[target][moves_closer] == False:
+                    return []
+            elif len(TRAFFIC_CONTROLLER[target]) == 3 and moves_closer not in TRAFFIC_CONTROLLER[target]:
+                TRAFFIC_CONTROLLER[target][moves_closer] = False
                 return []
-        elif len(TRAFFIC_CONTROLLER[target]) == 3 and moves_closer not in TRAFFIC_CONTROLLER[target]:
-            TRAFFIC_CONTROLLER[target][moves_closer] = False
-            return []
-        else:
-            TRAFFIC_CONTROLLER[target][moves_closer] = True
+            else:
+                TRAFFIC_CONTROLLER[target][moves_closer] = True
 
     y_move = Direction.North
     x_move = Direction.East
