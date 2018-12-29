@@ -21,6 +21,8 @@ namespace hlt {
         int INSPIRED_EXTRACT_RATIO;
         double INSPIRED_BONUS_MULTIPLIER;
         int INSPIRED_MOVE_COST_RATIO;
+        int HEIGHT;
+        int WIDTH;
     }
 }
 

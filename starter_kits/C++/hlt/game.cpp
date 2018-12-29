@@ -42,15 +42,13 @@ void hlt::Game::update_frame() {
     game_map->_update();
 
     for (const auto& player : players) {
-        for (auto& ship_iterator : player->ships) {
-            auto ship = ship_iterator.second;
+        for (auto ship : player->ships) {
             game_map->at(ship)->mark_unsafe(ship);
         }
 
         game_map->at(player->shipyard)->structure = player->shipyard;
 
-        for (auto& dropoff_iterator : player->dropoffs) {
-            auto dropoff = dropoff_iterator.second;
+        for (auto dropoff : player->dropoffs) {
             game_map->at(dropoff)->structure = dropoff;
         }
     }

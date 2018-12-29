@@ -2,8 +2,10 @@
 
 #include "types.hpp"
 #include "direction.hpp"
+#include "constants.hpp"
 
 #include <iostream>
+#include <stdexcept>
 
 namespace hlt {
     struct Position {
@@ -11,7 +13,17 @@ namespace hlt {
         int y;
 
         Position() : x(0), y(0) {}
-        Position(int x, int y) : x(x), y(y) {}
+        Position(int x, int y) : x(x), y(y) {
+#ifdef DEBUG
+  if( ((x%constants::WIDTH)+constants::WIDTH)%constants::WIDTH != x ){
+    throw std::runtime_error("Not normilized x");
+  }
+  if( ((y%constants::HEIGHT)+constants::HEIGHT)%constants::HEIGHT != x ){
+    throw std::runtime_error("Not normilized y");
+  }
+#endif
+
+        }
 
         bool operator==(const Position& other) const { return x == other.x && y == other.y; }
         bool operator!=(const Position& other) const { return x != other.x || y != other.y; }
@@ -29,29 +41,21 @@ namespace hlt {
         }
 
         Position directional_offset(Direction d) const {
-            auto dx = 0;
-            auto dy = 0;
             switch (d) {
                 case Direction::NORTH:
-                    dy = -1;
-                    break;
+                    return Position{x, (y == 0)?(constants::HEIGHT-1):(y-1)};
                 case Direction::SOUTH:
-                    dy = 1;
-                    break;
+                    return Position{x, (y == constants::HEIGHT-1)?0:(y+1)};
                 case Direction::EAST:
-                    dx = 1;
-                    break;
+                    return Position{(x == constants::WIDTH-1)?0:(x+1), y};
                 case Direction::WEST:
-                    dx = -1;
-                    break;
+                    return Position{(x == 0)?(constants::WIDTH-1):(x-1), y};
                 case Direction::STILL:
-                    // No move
-                    break;
+                    return *this;
                 default:
                     log::log(std::string("Error: directional_offset: unknown direction ") + static_cast<char>(d));
                     exit(1);
             }
-            return Position{x + dx, y + dy};
         }
 
         std::array<Position, 4> get_surrounding_cardinals() {

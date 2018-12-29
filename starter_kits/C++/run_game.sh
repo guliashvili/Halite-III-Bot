@@ -3,5 +3,5 @@
 set -e
 
 cmake .
-make
+ make
 ./halite --replay-directory replays/ -vvv --width 32 --height 32 "./MyBot" "./MyBot"

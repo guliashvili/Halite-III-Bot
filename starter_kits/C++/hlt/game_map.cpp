@@ -1,5 +1,6 @@
 #include "game_map.hpp"
 #include "input.hpp"
+#include "constants.hpp"
 
 void hlt::GameMap::_update() {
     for (int y = 0; y < height; ++y) {
@@ -24,6 +25,8 @@ std::unique_ptr<hlt::GameMap> hlt::GameMap::_generate() {
     std::unique_ptr<hlt::GameMap> map = std::make_unique<GameMap>();
 
     hlt::get_sstream() >> map->width >> map->height;
+    constants::WIDTH = map->width;
+    constants::HEIGHT = map->height;
 
     map->cells.resize((size_t)map->height);
     for (int y = 0; y < map->height; ++y) {
