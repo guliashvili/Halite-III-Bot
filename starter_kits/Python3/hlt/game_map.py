@@ -88,7 +88,7 @@ class GameMap:
         :return: the contents housing that cell or entity
         """
         if isinstance(location, Position):
-            location = self.normalize(location)
+            self.normalize(location)
             return self._cells[location.y][location.x]
         elif isinstance(location, Entity):
             return self._cells[location.position.y][location.position.x]
@@ -102,8 +102,8 @@ class GameMap:
         :param target: The target to where calculate
         :return: The distance between these items
         """
-        source = self.normalize(source)
-        target = self.normalize(target)
+        self.normalize(source)
+        self.normalize(target)
         resulting_position = abs(source - target)
         return min(resulting_position.x, self.width - resulting_position.x) + \
             min(resulting_position.y, self.height - resulting_position.y)
@@ -117,7 +117,15 @@ class GameMap:
         :param position: A position object.
         :return: A normalized position object fitting within the bounds of the map
         """
-        return Position(position.x % self.width, position.y % self.height)
+        if position.x < 0:
+            position.x += self.width
+        elif position.x >= self.width:
+            position.x -= self.width
+
+        if position.y >= self.height:
+            position.y -= self.height
+        elif position.y < 0:
+            position.y += self.height
 
     @staticmethod
     def _get_target_direction(source, target):
@@ -140,8 +148,8 @@ class GameMap:
         :param destination: The destination towards which you wish to move your object.
         :return: A list of valid (closest) Directions towards your target.
         """
-        source = self.normalize(source)
-        destination = self.normalize(destination)
+        self.normalize(source)
+        self.normalize(destination)
         possible_moves = []
         distance = Position(abs(destination.x-source.x), abs(destination.y-source.y))
         y_cardinality, x_cardinality = self._get_target_direction(source, destination)
@@ -163,16 +171,19 @@ class GameMap:
         :param destination: The destination towards which you wish to move your object.
         :return: A list of valid (closest) Directions towards your target.
         """
-        return self._unsafe_moves_x_cache[source.x%self.width][destination.x%self.width] + self._unsafe_moves_y_cache[source.y%self.height][destination.y%self.height]
+        self.normalize(source)
+        self.normalize(destination)
+        return self._unsafe_moves_x_cache[source.x][destination.x] + self._unsafe_moves_y_cache[source.y][destination.y]
 
-    def get_safe_moves(self, source, target=None, recall=False, possible_directions=set(Direction.get_all_cardinals())):
+    def get_safe_moves(self, source, target=None, recall=False, possible_directions=Direction.get_all_cardinals()):
         safe_directions = []
         if target is not None:
             possible_directions = set(possible_directions) & set(self.get_unsafe_moves(source, target))
+
         for direction in possible_directions:
-            target_pos = source.directional_offset(direction)
-            target_cell = self[target_pos]
-            if (self.is_drop_place(target_cell) and target_cell.structure.owner != self.owner) or (recall and self.is_drop_place(target_cell)) or direction == Direction.Still or not target_cell.is_occupied:
+            target_cell = self[source.directional_offset(direction)]
+
+            if not target_cell.is_occupied or direction == Direction.Still or (recall and self.is_my_drop_place(target_cell)):
                 safe_directions.append(direction)
 
         return safe_directions
@@ -198,9 +209,8 @@ class GameMap:
             self[ship.position].mark_unsafe(None) # Mark safe
         return direction,target_pos
 
-    _drop_place_types = (type(Shipyard(0,0,0)), type(Dropoff(0,0,0)))
-    def is_drop_place(self, cell):
-        return cell.structure_type is not None and cell.structure.owner == self.owner
+    def is_my_drop_place(self, cell):
+        return cell.structure is not None and cell.structure.owner == self.owner
 
     @staticmethod
     def _generate():

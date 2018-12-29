@@ -473,7 +473,7 @@ while True:
         # For each of your ships, move randomly if the ship is on a low halite location or the ship is full.
         #   Else, collect halite.
         #logger.info(f'is_drop_place {ship} structure_type={game_map[ship.position].structure_type}')
-        if game_map.is_drop_place(game_map[ship.position]):
+        if game_map.is_my_drop_place(game_map[ship.position]):
             #set_state(ship, GO_HOME_RECALL, False) let it stay there
             set_state(ship, GO_HOME_EFFICIENT, False)
             AVERAGE_TIME_TO_HOME = AVERAGE_TIME_TO_HOME * GENES["AVERAGE_TIME_HOME_DECAY"] + get_state(ship, NUM_OF_MOVES_FROM_HOME) * (1-GENES["AVERAGE_TIME_HOME_DECAY"])
