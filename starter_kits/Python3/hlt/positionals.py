@@ -19,11 +19,11 @@ class Direction:
         Returns all contained items in each cardinal
         :return: An array of cardinals
         """
-        return [Direction.North, Direction.South, Direction.East, Direction.West]
+        return (Direction.North, Direction.South, Direction.East, Direction.West)
 
     @staticmethod
     def get_all_moves():
-        return Direction.get_all_cardinals() + [Direction.Still]
+        return (Direction.North, Direction.South, Direction.East, Direction.West, Direction.Still)
 
     @staticmethod
     def convert(direction):

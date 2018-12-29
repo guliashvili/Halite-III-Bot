@@ -75,6 +75,9 @@ class GameMap:
         self.height = height
         self._cells = cells
 
+        self._unsafe_moves_x_cache = [[self._get_unsafe_moves_slow(Position(x1,0,False), Position(x2,0,False)) for x2 in range(constants.WIDTH)] for x1 in range(constants.WIDTH)]
+        self._unsafe_moves_y_cache = [[self._get_unsafe_moves_slow(Position(0,y1,False), Position(0,y2,False)) for y2 in range(constants.HEIGHT)] for y1 in range(constants.HEIGHT)]
+
     def init(self, owner):
         self.owner = owner
 
@@ -128,7 +131,7 @@ class GameMap:
         return (Direction.South if target.y > source.y else Direction.North if target.y < source.y else None,
                 Direction.East if target.x > source.x else Direction.West if target.x < source.x else None)
 
-    def get_unsafe_moves(self, source, destination):
+    def _get_unsafe_moves_slow(self, source, destination):
         """
         Return the Direction(s) to move closer to the target point, or empty if the points are the same.
         This move mechanic does not account for collisions. The multiple directions are if both directional movements
@@ -150,6 +153,17 @@ class GameMap:
             possible_moves.append(y_cardinality if distance.y < (self.height / 2)
                                   else Direction.invert(y_cardinality))
         return possible_moves
+
+    def get_unsafe_moves(self, source, destination):
+        """
+        Return the Direction(s) to move closer to the target point, or empty if the points are the same.
+        This move mechanic does not account for collisions. The multiple directions are if both directional movements
+        are viable.
+        :param source: The starting position
+        :param destination: The destination towards which you wish to move your object.
+        :return: A list of valid (closest) Directions towards your target.
+        """
+        return self._unsafe_moves_x_cache[source.x%self.width][destination.x%self.width] + self._unsafe_moves_y_cache[source.y%self.height][destination.y%self.height]
 
     def get_safe_moves(self, source, target=None, recall=False, possible_directions=set(Direction.get_all_cardinals())):
         safe_directions = []
