@@ -143,26 +143,55 @@ def get_dp(turn, position):
 def set_dp(turn, position, value):
     dp[turn][position.x][position.y] = value
 
+def traffic_controller_update(position, target, recall, dry_run=False):
+    distance_to_target = game_map.calculate_distance(position, target)
+    moves_closer = tuple(game_map.get_unsafe_moves(position, target))
+
+    if not recall:
+        if distance_to_target != 1 and (distance_to_target < GENES["TRAFFIC_CONTROLLER_DISTANCE_MARGIN"] and len(moves_closer) == 1):
+            if target not in TRAFFIC_CONTROLLER:
+                if dry_run is True:
+                    return True
+                TRAFFIC_CONTROLLER[target] = {}
+
+            if len(TRAFFIC_CONTROLLER[target]) == 4:
+                if TRAFFIC_CONTROLLER[target][moves_closer] is False:
+                    return False
+            elif len(TRAFFIC_CONTROLLER[target]) == 3 and moves_closer not in TRAFFIC_CONTROLLER[target]:
+                if dry_run is False:
+                    TRAFFIC_CONTROLLER[target][moves_closer] = False
+                return False
+            else:
+                if dry_run is False:
+                    TRAFFIC_CONTROLLER[target][moves_closer] = True
+    return True
+
 def compute_dp(ship, targets, recall=False):
     global game_map
     global MARK
 
+    targets = [target for target in targets if traffic_controller_update(ship.position, target, recall, dry_run=True)]
+    if len(targets) == 0:
+        return [], None
     target = sorted(targets, key=lambda x: game_map.calculate_distance(ship.position, x))[0]
 
     MARK += 1
 
     distance_to_target = game_map.calculate_distance(ship.position, target)
-    len_dp = 2 + int(distance_to_target*1.5)
+    len_dp = 2 + int(distance_to_target*1.3)
     moves_closer = tuple(game_map.get_unsafe_moves(ship.position, target))
 
+    if not traffic_controller_update(ship.position, target, recall):
+        logger.error("TRAFFIC CONTROLLER failed")
+
     if not recall:
-        if distance_to_target < GENES["TRAFFIC_CONTROLLER_DISTANCE_MARGIN"] and len(moves_closer) == 1:
+        if distance_to_target != 1 and (distance_to_target < GENES["TRAFFIC_CONTROLLER_DISTANCE_MARGIN"] and len(moves_closer) == 1):
             if target not in TRAFFIC_CONTROLLER:
                 TRAFFIC_CONTROLLER[target] = {}
 
             if len(TRAFFIC_CONTROLLER[target]) == 4:
-                if TRAFFIC_CONTROLLER[target][moves_closer] == False:
-                    return []
+                if TRAFFIC_CONTROLLER[target][moves_closer] is False:
+                    return [], None
             elif len(TRAFFIC_CONTROLLER[target]) == 3 and moves_closer not in TRAFFIC_CONTROLLER[target]:
                 TRAFFIC_CONTROLLER[target][moves_closer] = False
                 return []
@@ -235,19 +264,20 @@ def compute_dp(ship, targets, recall=False):
                 break
             cur_edge_position = cur_edge_position.directional_offset(x_move)
 
-    return [(num_turn, dp[num_turn][target.x][target.y][1], dp[num_turn][target.x][target.y][0]) for num_turn in range(len_dp) if dp[num_turn][target.x][target.y][2] == MARK]
+    return [(num_turn, dp[num_turn][target.x][target.y][1], dp[num_turn][target.x][target.y][0]) for num_turn in range(len_dp) if dp[num_turn][target.x][target.y][2] == MARK], target
 
 
 def go_to_point_fast(ship, targets, recall=False):
     global game_map
 
-    num_turn_and_dir = compute_dp(ship, targets, recall)
+    num_turn_and_dir, target = compute_dp(ship, targets, recall)
     #logger.debug(f'dp_results= {num_turn_and_dir}; turn={game.turn_number}')
     if len(num_turn_and_dir) == 0:
         #logger.info(f'{ship}  targets={targets}; recall={recall} stay still, meh; turn={game.turn_number}')
         push_decision(ship, [Direction.Still])
     else:
         #logger.info(f'{ship}  targets={targets}; recall={recall} go_to={num_turn_and_dir[0][1]}; turn={game.turn_number}')
+        traffic_controller_update(ship.position.directional_offset(num_turn_and_dir[0][1]), target, recall)
         push_decision(ship, [num_turn_and_dir[0][1]])
 
 def go_home_fast(ship, recall=False):
@@ -258,7 +288,7 @@ def go_home_fast(ship, recall=False):
 def go_to_point_efficient(ship, targets, recall=False):
     global game_map
 
-    num_turn_and_dir = compute_dp(ship, targets, recall)
+    num_turn_and_dir, target = compute_dp(ship, targets, recall)
     #logger.debug(f'dp_results= {num_turn_and_dir}; turn={game.turn_number}')
 
     if len(num_turn_and_dir) == 0:
@@ -270,6 +300,8 @@ def go_to_point_efficient(ship, targets, recall=False):
             cur = (halite*1.0/(get_state(ship, NUM_OF_MOVES_FROM_HOME) + num_turn), direction)
             if best is None or cur > best:
                 best = cur
+
+        traffic_controller_update(ship.position.directional_offset(best[1]), target, recall)
         #logger.info(f'{ship} recall={recall} targets={targets}; best={best}; turn={game.turn_number}')
         push_decision(ship, [best[1]])
 
@@ -330,7 +362,7 @@ def pair_ships(ships):
 
     for i, target, efficiency in sorted(ship_candidates, key=lambda arg: arg[2], reverse=True):
 
-        if ship_satisfied[i] == True:
+        if ship_satisfied[i] is True:
             continue
         if ship_pair_used[target.x][target.y] == MARK:
             continue
