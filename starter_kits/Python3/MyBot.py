@@ -131,7 +131,7 @@ def is_time_to_recall(ship):
     return is_it
 
 _ONCE_INIT = (None, None, -1)
-dp = [[[_ONCE_INIT for _y in range(constants.HEIGHT)] for _x in range(constants.WIDTH)] for _turn in range(2+int((constants.HEIGHT+constants.WIDTH)*1.5))]
+dp = [[[_ONCE_INIT for _y in range(constants.HEIGHT)] for _x in range(constants.WIDTH)] for _turn in range(2+int((constants.HEIGHT+constants.WIDTH)*1.3))]
 MARK = 1
 
 def get_dp(turn, position):
