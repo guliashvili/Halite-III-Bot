@@ -32,5 +32,8 @@ namespace hlt {
         void mark_unsafe(std::shared_ptr<Ship>& ship) {
             this->ship = ship;
         }
+        void mark_safe(){
+          ship = nullptr;
+        }
     };
 }

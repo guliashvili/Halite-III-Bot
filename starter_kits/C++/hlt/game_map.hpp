@@ -12,20 +12,25 @@ namespace hlt {
         int width;
         int height;
         std::vector<std::vector<MapCell>> cells;
+        PlayerId me = -1;
+
+        void init(PlayerId me_){
+          me = me_;
+        }
 
         MapCell* at(const Position& position) {
             return &cells[position.y][position.x];
         }
 
-        MapCell* at(const Entity& entity) {
+        inline MapCell* at(const Entity& entity) {
             return at(entity.position);
         }
 
-        MapCell* at(const Entity* entity) {
+        inline MapCell* at(const Entity* entity) {
             return at(entity->position);
         }
 
-        MapCell* at(const std::shared_ptr<Entity>& entity) {
+        inline MapCell* at(const std::shared_ptr<Entity>& entity) {
             return at(entity->position);
         }
 
@@ -62,28 +67,36 @@ namespace hlt {
             return possible_moves;
         }
 
-        std::vector<Direction> get_safe_moves(const Position& source, const Position& destination) {
+        bool has_my_structure(const Position& position){
+          const auto& cell = at(position);
+          return cell->has_structure() && cell->structure->owner == me;
+        }
+
+        std::vector<Direction> get_safe_moves(const Position& source, const Position& destination, bool recall=false) {
           auto directions = get_unsafe_moves(source, destination);
           std::vector<Direction> safe_directions;
           for(auto direction : directions){
-            if(!at(source.directional_offset(direction))->is_occupied()){
+            const auto& next_pos = source.directional_offset(direction);
+            if(!at(next_pos)->is_occupied() || (recall && has_my_structure(next_pos))){
               safe_directions.push_back(direction);
             }
           }
           return safe_directions;
         }
 
-        Direction naive_navigate(std::shared_ptr<Ship> ship, const Position& destination) {
+        void navigate(std::shared_ptr<Ship> ship, const Position& destination) {
             // get_unsafe_moves normalizes for us
-            for (auto direction : get_unsafe_moves(ship->position, destination)) {
-                Position target_pos = ship->position.directional_offset(direction);
-                if (!at(target_pos)->is_occupied()) {
-                    at(target_pos)->mark_unsafe(ship);
-                    return direction;
-                }
+            if(destination != ship->position){
+              at(ship->position)->mark_safe();
+              at(destination)->mark_unsafe(ship);
             }
-
-            return Direction::STILL;
+            #ifdef DEBUG
+            //TODO
+            #endif
+        }
+        void navigate(std::shared_ptr<Ship> ship, const Direction& direction) {
+            // get_unsafe_moves normalizes for us
+            navigate(ship, ship->position.directional_offset(direction));
         }
 
         bool can_move(std::shared_ptr<Ship> ship){

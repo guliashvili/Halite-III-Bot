@@ -6,6 +6,9 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <string>
+
+using namespace std;
 
 namespace hlt {
     struct Position {
@@ -13,17 +16,7 @@ namespace hlt {
         int y;
 
         Position() : x(0), y(0) {}
-        Position(int x, int y) : x(x), y(y) {
-#ifdef DEBUG
-  if( ((x%constants::WIDTH)+constants::WIDTH)%constants::WIDTH != x ){
-    throw std::runtime_error("Not normilized x");
-  }
-  if( ((y%constants::HEIGHT)+constants::HEIGHT)%constants::HEIGHT != x ){
-    throw std::runtime_error("Not normilized y");
-  }
-#endif
-
-        }
+        Position(int x, int y) : x(x), y(y) {}
 
         bool operator==(const Position& other) const { return x == other.x && y == other.y; }
         bool operator!=(const Position& other) const { return x != other.x || y != other.y; }
@@ -51,7 +44,7 @@ namespace hlt {
                 case Direction::WEST:
                     return Position{(x == 0)?(constants::WIDTH-1):(x-1), y};
                 case Direction::STILL:
-                    return *this;
+                    return Position{x,y};
                 default:
                     log::log(std::string("Error: directional_offset: unknown direction ") + static_cast<char>(d));
                     exit(1);
