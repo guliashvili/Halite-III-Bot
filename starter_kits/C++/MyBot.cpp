@@ -30,9 +30,24 @@ Direction greedySquareMove(shared_ptr<Ship> ship, Position& target, bool recall=
   auto directions = game.game_map->get_safe_moves(ship->position, target, recall);
   if(directions.size() == 0){
     return Direction::STILL;
+  }else if(directions.size() == 1){
+    return directions[0];
+  }else {
+    auto a = game.game_map->at(ship->position.directional_offset(directions[0]));
+    auto b = game.game_map->at(ship->position.directional_offset(directions[1]));
+    if(a->halite > b->halite){
+      swap(a,b);
+    }
+    if(a->move_cost() > ship->halite - game.game_map->at(ship->position)->move_cost()){
+      return directions[1];
+    }else if(b->move_cost() - a->move_cost() < genes->greedy_walk_randomisation_margin){
+      srand(ship->id * game.turn_number * target.x * target.y * genes->seed);
+      return directions[rand()%directions.size()];
+    }else{
+      return directions[0];
+    }
   }
-  srand(ship->id * game.turn_number * target.x * target.y);
-  return directions[rand()%directions.size()];
+
 }
 
 pair<int, shared_ptr<Entity>> getMinDistanceToDropoff(Position& position, const vector<shared_ptr<Entity>>& dropoffs){
@@ -86,8 +101,9 @@ void pair_ships(vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>,
               continue;
             }
 
-            auto target_halite_amount = game.game_map->at(pos)->halite;
-            if(target_halite_amount/constants::EXTRACT_RATIO == 0){
+            auto target_cell = game.game_map->at(pos);
+            auto target_halite_amount = target_cell->halite;
+            if(target_cell->extract_halite() == 0){
               continue;
             }
             //TODO SOMEONE ELSE SITS ON THAT
@@ -151,7 +167,7 @@ bool should_ship_new_ship(){
     Position position;
     for(int& i = position.y = 0; i < constants::HEIGHT; i++){
       for(int& j = position.x = 0; j < constants::WIDTH; j++){
-        total_halite += game.game_map->at(position)->halite;
+        total_halite += max(0, game.game_map->at(position)->halite - genes->total_halite_margin_substr);
       }
     }
   }
@@ -288,7 +304,7 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
   return ret;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, const char* argv[]) {
 
     _candidates.reserve(constants::WIDTH * constants::HEIGHT * 100);
     // At this point "game" variable is populated with initial map data.

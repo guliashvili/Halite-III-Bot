@@ -32,6 +32,14 @@ namespace hlt {
         void mark_unsafe(const std::shared_ptr<Ship>& ship) {
             this->ship = ship;
         }
+
+        int extract_halite() const{
+          return (halite + constants::EXTRACT_RATIO - 1)/constants::EXTRACT_RATIO;
+        }
+
+        int move_cost() const{
+          return halite/constants::MOVE_COST_RATIO;
+        }
         void mark_safe(){
           ship = nullptr;
         }
