@@ -10,6 +10,9 @@
 #include <tuple>
 #include <array>
 #include <algorithm>
+#include <ctime>
+#include <ratio>
+#include <chrono>
 
 using namespace std;
 using namespace hlt;
@@ -28,6 +31,7 @@ Direction greedySquareMove(shared_ptr<Ship> ship, Position& target, bool recall=
   if(directions.size() == 0){
     return Direction::STILL;
   }
+  srand(ship->id * game.turn_number * target.x * target.y);
   return directions[rand()%directions.size()];
 }
 
@@ -46,8 +50,7 @@ pair<int, shared_ptr<Entity>> getMinDistanceToDropoff(Position& position, const 
 
 std::optional<Direction> isRecallTime(shared_ptr<Ship> ship){
   auto minDstDropoff = getMinDistanceToDropoff(ship->position, me->all_dropoffs);
-  if(constants::MAX_TURNS - game.turn_number - genes->extra_time_for_recall
-    > minDstDropoff.first){
+  if(constants::MAX_TURNS - game.turn_number - genes->extra_time_for_recall > (minDstDropoff.first+me->ships.size()/10.0/me->all_dropoffs.size()) ){
       return {};
   }
   return greedySquareMove(ship, minDstDropoff.second->position, true);// TODO might stand still when blocked
@@ -69,6 +72,7 @@ int ship_pair_st[64][64] = {{0}};
 int PAIR_MARK = 1;
 
 void pair_ships(vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>, Direction>>&  ship_directions){
+  PAIR_MARK++;
   auto& candidates = _candidates;
   candidates.resize(0);
 
@@ -86,6 +90,7 @@ void pair_ships(vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>,
             if(target_halite_amount/constants::EXTRACT_RATIO == 0){
               continue;
             }
+            //TODO SOMEONE ELSE SITS ON THAT
 
             for(unsigned i = 0; i < ships.size(); i++){
               auto ship = ships[i];
@@ -120,6 +125,13 @@ void pair_ships(vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>,
 
     ship_pair_st[pos.y][pos.x] = PAIR_MARK;
     ship = nullptr;
+  }
+
+  for(auto& ship : ships){
+    if(ship != nullptr){
+      navigate(ship, Direction::STILL, ship_directions);
+      //log::log("pairstill " + to_string(ship->id));
+    }
   }
 }
 
@@ -156,17 +168,23 @@ bool should_ship_new_ship(){
     && constants::MAX_TURNS - AVERAGE_TIME_TO_HOME > genes->ship_spawn_step_margin;
 }
 
-vector<shared_ptr<Ship>> oplock_doStepNoStill(const vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue_original){
+vector<shared_ptr<Ship>> oplock_doStepNoStill(vector<shared_ptr<Ship> > ships, vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue_original){
     vector<tuple<shared_ptr<Ship>, Direction>> direction_queue_temporary;
     direction_queue_temporary.reserve(ships.size());
 
     vector<shared_ptr<Ship>> ready_to_pair;
     vector<shared_ptr<Ship> > going_home;
+    sort(ships.begin(), ships.end(), [ ]( const auto& lhs, const auto& rhs )
+      {
+         return  get<0>(getMinDistanceToDropoff(lhs->position, game.me->all_dropoffs))
+            < get<0>(getMinDistanceToDropoff(rhs->position, game.me->all_dropoffs));
+      });
     for (const auto& ship : ships) {
         // if(!game_map->can_move(ship)){ Should be checked already
         //   command_queue.push_back(ship->stay_still());
         // }else
         if(auto recall=isRecallTime(ship)){
+          //log::log("recalltime");
           navigate(ship, recall.value(), direction_queue_temporary);
         }else if(auto goHome=shouldGoHome(ship)){
           going_home.push_back(ship);
@@ -180,8 +198,14 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(const vector<shared_ptr<Ship> >& s
     for(auto& ship : going_home){
       if(auto goHome=shouldGoHome(ship)){
         navigate(ship, goHome.value(), direction_queue_temporary);
+        // if(goHome.value() == Direction::STILL){
+        //   //log::log("gohomestill " + to_string(ship->id));
+        // }
       }else{
         navigate(ship,  Direction::STILL, direction_queue_temporary);
+        // if(goHome.value() == Direction::STILL){
+        //   //log::log("nogohomestill " + to_string(ship->id));
+        // }
       }
     }
 
@@ -204,22 +228,30 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(const vector<shared_ptr<Ship> >& s
           }
           ships_no_still.push_back(ship);
         }else{
+          game.game_map->at(ship->position)->mark_unsafe(ship);
           direction_queue_original.emplace_back(ship, direction);
+          //log::log("stay stil; " + to_string(ship->id));
         }
       }
 
       return ships_no_still;
     }else{
+      // for(auto& [ship, direction] : direction_queue_temporary){
+      //   //log::log("the end: " + to_string(ship->id));
+      // }
       direction_queue_original.insert(direction_queue_original.end(), direction_queue_temporary.begin(), direction_queue_temporary.end());
       return {};
     }
 }
 
 bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
+  using namespace std::chrono;
+
+  // high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
   me = game.me;
   unique_ptr<GameMap>& game_map = game.game_map;
   game_map->init(me->id);
-  PAIR_MARK++;
 
   int SAVINGS = 0;
 
@@ -232,6 +264,7 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
         NUM_OF_MOVES_FROM_HOME[ship->id] = 0;
       }
       if(!game_map->can_move(ship)){
+        //log::log("can not move " + to_string(ship->id));
         navigate(ship, Direction::STILL, direction_queue);
       }else{
         game.game_map->at(ship->position)->mark_safe();
@@ -239,18 +272,20 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
       }
   }
 
-  while((ships=oplock_doStepNoStill(ships, direction_queue)).size() != 0);
+  // int num_of_turns = 0;
+  while((ships=oplock_doStepNoStill(ships, direction_queue)).size() != 0){
+    // num_of_turns++;
+    //log::log("\n\n");
+  }
 
 
   for (const auto& ship : me->ships) {
       NUM_OF_MOVES_FROM_HOME[ship->id]++;
   }
 
-  if(me->halite - SAVINGS >= constants::SHIP_COST &&  !(game_map->at(me->shipyard->position)->is_occupied()) && should_ship_new_ship()){
-    return true;
-  }else{
-    return false;
-  }
+  //log::log("doStep duration: " + to_string(duration_cast<duration<double>>(high_resolution_clock::now() - t1).count()) + " num: " + to_string(num_of_turns)  + " ships: " + to_string(me->ships.size()));
+  auto ret = me->halite - SAVINGS >= constants::SHIP_COST &&  !(game_map->at(me->shipyard->position)->is_occupied()) && should_ship_new_ship();
+  return ret;
 }
 
 int main(int argc, char* argv[]) {
@@ -262,7 +297,7 @@ int main(int argc, char* argv[]) {
     game.ready("MyCppBot");
     genes = make_unique<Genes>(argc, argv);
     srand(genes->seed);
-    log::log("Successfully created bot! My Player ID is " + to_string(game.my_id) + ". Bot rng seed is " + to_string(genes->seed) + ".");
+    //log::log("Successfully created bot! My Player ID is " + to_string(game.my_id) + ". Bot rng seed is " + to_string(genes->seed) + ".");
 
     vector<Command> command_queue;
     vector<tuple<shared_ptr<Ship>, Direction>> direction_queue;
