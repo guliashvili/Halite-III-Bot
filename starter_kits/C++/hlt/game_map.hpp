@@ -72,12 +72,13 @@ namespace hlt {
           return cell->has_structure() && cell->structure->owner == me;
         }
 
-        std::vector<Direction> get_safe_moves(const Position& source, const Position& destination, bool recall=false) {
+        std::vector<Direction> get_safe_moves(Position& source, const Position& destination, bool recall=false) {
           auto directions = get_unsafe_moves(source, destination);
           std::vector<Direction> safe_directions;
+
           for(auto direction : directions){
             const auto& next_pos = source.directional_offset(direction);
-            if(!at(next_pos)->is_occupied() || (recall && has_my_structure(next_pos))){
+            if(!at(next_pos)->is_occupied() || (recall &&  has_my_structure(next_pos))){
               safe_directions.push_back(direction);
             }
           }
@@ -86,10 +87,8 @@ namespace hlt {
 
         void navigate(std::shared_ptr<Ship> ship, const Position& destination) {
             // get_unsafe_moves normalizes for us
-            if(destination != ship->position){
-              at(ship->position)->mark_safe();
-              at(destination)->mark_unsafe(ship);
-            }
+            at(destination)->mark_unsafe(ship);
+
             #ifdef DEBUG
             //TODO
             #endif

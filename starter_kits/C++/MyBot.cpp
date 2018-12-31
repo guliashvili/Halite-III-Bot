@@ -18,9 +18,9 @@ unique_ptr<Genes> genes;
 Game game;
 shared_ptr<Player> me;
 
-Command navigate(const shared_ptr<Ship> ship, const Direction& direction){
+void navigate(const shared_ptr<Ship> ship, const Direction& direction,vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
   game.game_map->navigate(ship, direction);
-  return command::move(ship->id,direction);
+  direction_queue.emplace_back(ship, direction);
 }
 
 Direction greedySquareMove(shared_ptr<Ship> ship, Position& target, bool recall=false){
@@ -50,7 +50,7 @@ std::optional<Direction> isRecallTime(shared_ptr<Ship> ship){
     > minDstDropoff.first){
       return {};
   }
-  return greedySquareMove(ship, minDstDropoff.second->position, true);
+  return greedySquareMove(ship, minDstDropoff.second->position, true);// TODO might stand still when blocked
 }
 
 
@@ -60,23 +60,28 @@ std::optional<Direction> shouldGoHome(shared_ptr<Ship> ship){
   }
 
   auto minDstDropoff = getMinDistanceToDropoff(ship->position, me->all_dropoffs);
-  return greedySquareMove(ship, minDstDropoff.second->position);
+  return greedySquareMove(ship, minDstDropoff.second->position); // TODO might stand still when blocked
 }
 
 
 vector<tuple<unsigned,Position, double> > _candidates;
 int ship_pair_st[64][64] = {{0}};
-int MARK = 1;
+int PAIR_MARK = 1;
 
-void pair_ships(vector<shared_ptr<Ship> >& ships, vector<Command>& command_queue){
+void pair_ships(vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>, Direction>>&  ship_directions){
   auto& candidates = _candidates;
   candidates.resize(0);
-  MARK++;
+
+  vector<tuple<shared_ptr<Ship>, Direction>> ret;
 
   {
     Position pos;
     for(int& y = pos.y = 0; y < constants::HEIGHT; y++){
         for(int& x = pos.x = 0; x < constants::WIDTH; x++){
+            if(ship_pair_st[y][x] == PAIR_MARK){
+              continue;
+            }
+
             auto target_halite_amount = game.game_map->at(pos)->halite;
             if(target_halite_amount/constants::EXTRACT_RATIO == 0){
               continue;
@@ -97,11 +102,13 @@ void pair_ships(vector<shared_ptr<Ship> >& ships, vector<Command>& command_queue
        return std::get<2>(lhs) > std::get<2>(rhs);
     });
 
-  for(auto& [ i, pos, efficiency ] : candidates){
+  for(unsigned I = 0; I < candidates.size(); I++){
+    auto i = get<0>(candidates[I]);
+    auto& pos = get<1>(candidates[I]);
     if(ships[i] == nullptr){
       continue;
     }
-    if(ship_pair_st[pos.y][pos.x] == MARK){
+    if(ship_pair_st[pos.y][pos.x] == PAIR_MARK){
       continue;
     }
     auto& ship = ships[i];
@@ -109,16 +116,15 @@ void pair_ships(vector<shared_ptr<Ship> >& ships, vector<Command>& command_queue
       continue;
     }
 
-    command_queue.push_back(navigate(ship, greedySquareMove(ship, pos)));
+    navigate(ship, greedySquareMove(ship, pos), ship_directions);
 
-    ship_pair_st[pos.y][pos.x] = MARK;
+    ship_pair_st[pos.y][pos.x] = PAIR_MARK;
     ship = nullptr;
   }
-
 }
 
 
-bool GOING_HOME[1000] = {false};
+// bool GOING_HOME[1000] = {false};
 int NUM_OF_MOVES_FROM_HOME[1000] = {0};
 int AVERAGE_TIME_TO_HOME = 0;
 
@@ -150,39 +156,100 @@ bool should_ship_new_ship(){
     && constants::MAX_TURNS - AVERAGE_TIME_TO_HOME > genes->ship_spawn_step_margin;
 }
 
-void doStep(vector<Command>& command_queue){
-  me = game.me;
-  unique_ptr<GameMap>& game_map = game.game_map;
-  game_map->init(me->id);
-  int SAVINGS = 0;
+vector<shared_ptr<Ship>> oplock_doStepNoStill(const vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue_original){
+    vector<tuple<shared_ptr<Ship>, Direction>> direction_queue_temporary;
+    direction_queue_temporary.reserve(ships.size());
 
-  vector<shared_ptr<Ship>> ready_to_pair;
-  for (const auto& ship : me->ships) {
-      {
-        auto cell = game_map->at(ship->position);
-        if(cell->has_structure() && cell->structure->owner == me->id){
-          GOING_HOME[ship->id] = false;
-          AVERAGE_TIME_TO_HOME = AVERAGE_TIME_TO_HOME * genes->average_time_home_decay + NUM_OF_MOVES_FROM_HOME[ship->id] * (1-genes->average_time_home_decay);
-          NUM_OF_MOVES_FROM_HOME[ship->id] = 0;
+    vector<shared_ptr<Ship>> ready_to_pair;
+    vector<shared_ptr<Ship> > going_home;
+    for (const auto& ship : ships) {
+        // if(!game_map->can_move(ship)){ Should be checked already
+        //   command_queue.push_back(ship->stay_still());
+        // }else
+        if(auto recall=isRecallTime(ship)){
+          navigate(ship, recall.value(), direction_queue_temporary);
+        }else if(auto goHome=shouldGoHome(ship)){
+          going_home.push_back(ship);
+        }else{
+          ready_to_pair.push_back(ship);
+        }
+    }
+
+    pair_ships(ready_to_pair, direction_queue_temporary);
+
+    for(auto& ship : going_home){
+      if(auto goHome=shouldGoHome(ship)){
+        navigate(ship, goHome.value(), direction_queue_temporary);
+      }else{
+        navigate(ship,  Direction::STILL, direction_queue_temporary);
+      }
+    }
+
+    bool was_blocker = false;
+    for(auto& item : direction_queue_temporary){
+      if(get<1>(item) == Direction::STILL){
+          was_blocker = true;
+          break;
+      }
+    }
+
+    if(was_blocker){
+      vector<shared_ptr<Ship>> ships_no_still;
+      ships_no_still.reserve(ships.size());
+      for(auto& [ship, direction] : direction_queue_temporary){
+        if(direction != Direction::STILL){
+          auto target_pos = ship->position.directional_offset(direction);
+          if(game.game_map->at(target_pos)->ship == ship){
+            game.game_map->at(target_pos)->mark_safe();
+          }
+          ships_no_still.push_back(ship);
+        }else{
+          direction_queue_original.emplace_back(ship, direction);
         }
       }
 
-      if(!game_map->can_move(ship)){
-        command_queue.push_back(ship->stay_still());
-      }else if(auto recall=isRecallTime(ship)){
-        command_queue.push_back(navigate(ship, recall.value()));
+      return ships_no_still;
+    }else{
+      direction_queue_original.insert(direction_queue_original.end(), direction_queue_temporary.begin(), direction_queue_temporary.end());
+      return {};
+    }
+}
+
+bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
+  me = game.me;
+  unique_ptr<GameMap>& game_map = game.game_map;
+  game_map->init(me->id);
+  PAIR_MARK++;
+
+  int SAVINGS = 0;
+
+  vector<shared_ptr<Ship> > ships;
+
+  for (const auto& ship : me->ships) {
+      if(game_map->has_my_structure(ship->position)){
+        // GOING_HOME[ship->id] = false;
+        AVERAGE_TIME_TO_HOME = AVERAGE_TIME_TO_HOME * genes->average_time_home_decay + NUM_OF_MOVES_FROM_HOME[ship->id] * (1-genes->average_time_home_decay);
+        NUM_OF_MOVES_FROM_HOME[ship->id] = 0;
       }
-      else if(auto goHome=shouldGoHome(ship)){
-        command_queue.push_back(navigate(ship,goHome.value()));
+      if(!game_map->can_move(ship)){
+        navigate(ship, Direction::STILL, direction_queue);
       }else{
-          ready_to_pair.push_back(ship);
+        game.game_map->at(ship->position)->mark_safe();
+        ships.push_back(ship);
       }
   }
 
-  pair_ships(ready_to_pair, command_queue);
+  while((ships=oplock_doStepNoStill(ships, direction_queue)).size() != 0);
+
+
+  for (const auto& ship : me->ships) {
+      NUM_OF_MOVES_FROM_HOME[ship->id]++;
+  }
 
   if(me->halite - SAVINGS >= constants::SHIP_COST &&  !(game_map->at(me->shipyard->position)->is_occupied()) && should_ship_new_ship()){
-    command_queue.push_back(me->shipyard->spawn());
+    return true;
+  }else{
+    return false;
   }
 }
 
@@ -198,22 +265,28 @@ int main(int argc, char* argv[]) {
     log::log("Successfully created bot! My Player ID is " + to_string(game.my_id) + ". Bot rng seed is " + to_string(genes->seed) + ".");
 
     vector<Command> command_queue;
+    vector<tuple<shared_ptr<Ship>, Direction>> direction_queue;
     while(1){
       game.update_frame();
 
       command_queue.resize(0);
-      command_queue.reserve(game.me->ships.size());
-      doStep(command_queue);
+      command_queue.reserve(game.me->ships.size() + 1);
+      direction_queue.resize(0);
+      direction_queue.reserve(game.me->ships.size());
+
+
+      if(doStep(direction_queue)){
+        command_queue.push_back(command::spawn_ship());
+      }
+
+      for(auto& [ship, direction] : direction_queue){
+        command_queue.push_back(command::move(ship->id, direction));
+      }
 
       if (!game.end_turn(command_queue)) {
           break;
       }
     }
-
-
-
-
-
 
     return 0;
 }

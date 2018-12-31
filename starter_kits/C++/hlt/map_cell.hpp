@@ -29,7 +29,7 @@ namespace hlt {
             return static_cast<bool>(structure);
         }
 
-        void mark_unsafe(std::shared_ptr<Ship>& ship) {
+        void mark_unsafe(const std::shared_ptr<Ship>& ship) {
             this->ship = ship;
         }
         void mark_safe(){
