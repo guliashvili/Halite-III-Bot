@@ -72,11 +72,11 @@ std::optional<Direction> isRecallTime(shared_ptr<Ship> ship){
 }
 
 
-std::optional<Direction> shouldGoHome(shared_ptr<Ship> ship){
-  if(ship->halite < constants::MAX_HALITE*9/10){
-    return {};
-  }
+bool shouldGoHome(shared_ptr<Ship> ship){
+  return ship->halite >= constants::MAX_HALITE*9/10;
+}
 
+Direction goHome(shared_ptr<Ship> ship){
   auto minDstDropoff = getMinDistanceToDropoff(ship->position, me->all_dropoffs);
   return greedySquareMove(ship, minDstDropoff.second->position); // TODO might stand still when blocked
 }
@@ -184,57 +184,69 @@ bool should_ship_new_ship(){
     && constants::MAX_TURNS - AVERAGE_TIME_TO_HOME > genes->ship_spawn_step_margin;
 }
 
+bool GO_HOME_EFFICIENT[1000] = {false};
 vector<shared_ptr<Ship>> oplock_doStepNoStill(vector<shared_ptr<Ship> > ships, vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue_original){
     vector<tuple<shared_ptr<Ship>, Direction>> direction_queue_temporary;
     direction_queue_temporary.reserve(ships.size());
 
     vector<shared_ptr<Ship>> ready_to_pair;
     vector<shared_ptr<Ship> > going_home;
+    vector<shared_ptr<Ship> > going_home_now;
     sort(ships.begin(), ships.end(), [ ]( const auto& lhs, const auto& rhs )
       {
          return  get<0>(getMinDistanceToDropoff(lhs->position, game.me->all_dropoffs))
             < get<0>(getMinDistanceToDropoff(rhs->position, game.me->all_dropoffs));
       });
     for (const auto& ship : ships) {
-        // if(!game_map->can_move(ship)){ Should be checked already
-        //   command_queue.push_back(ship->stay_still());
-        // }else
+        if(game.game_map->has_my_structure(ship->position)){
+          GO_HOME_EFFICIENT[ship->id] = false;
+        }
+
         if(auto recall=isRecallTime(ship)){
           //log::log("recalltime");
           navigate(ship, recall.value(), direction_queue_temporary);
-        }else if(auto goHome=shouldGoHome(ship)){
+        }else if(GO_HOME_EFFICIENT[ship->id]){
           going_home.push_back(ship);
+        }else if(shouldGoHome(ship)){
+          going_home.push_back(ship);
+          going_home_now.push_back(ship);
         }else{
           ready_to_pair.push_back(ship);
         }
     }
 
-    pair_ships(ready_to_pair, direction_queue_temporary);
+    bool was_blocker = std::find_if (direction_queue_temporary.begin(), direction_queue_temporary.end(), [] (const auto& element)
+      {
+        return get<1>(element) == Direction::STILL;
+      }) != direction_queue_temporary.end();
 
-    for(auto& ship : going_home){
-      if(auto goHome=shouldGoHome(ship)){
-        navigate(ship, goHome.value(), direction_queue_temporary);
-        // if(goHome.value() == Direction::STILL){
-        //   //log::log("gohomestill " + to_string(ship->id));
-        // }
-      }else{
-        navigate(ship,  Direction::STILL, direction_queue_temporary);
-        // if(goHome.value() == Direction::STILL){
-        //   //log::log("nogohomestill " + to_string(ship->id));
-        // }
+
+    vector<shared_ptr<Ship>> ships_no_still;
+    if(!was_blocker){
+      pair_ships(ready_to_pair, direction_queue_temporary);
+
+      for(auto& ship : going_home){
+        const auto& goHomeDir=goHome(ship);
+        navigate(ship, goHomeDir, direction_queue_temporary);
+        GO_HOME_EFFICIENT[ship->id] = true;
+      }
+
+    }else{
+      for(auto& ship : ready_to_pair){
+        ships_no_still.push_back(ship);
+      }
+      for(auto& ship : going_home){
+        ships_no_still.push_back(ship);
       }
     }
 
-    bool was_blocker = false;
-    for(auto& item : direction_queue_temporary){
-      if(get<1>(item) == Direction::STILL){
-          was_blocker = true;
-          break;
-      }
-    }
+
+    was_blocker = was_blocker || std::find_if (direction_queue_temporary.begin(), direction_queue_temporary.end(), [] (const auto& element)
+      {
+        return get<1>(element) == Direction::STILL;
+      }) != direction_queue_temporary.end();
 
     if(was_blocker){
-      vector<shared_ptr<Ship>> ships_no_still;
       ships_no_still.reserve(ships.size());
       for(auto& [ship, direction] : direction_queue_temporary){
         if(direction != Direction::STILL){
@@ -246,14 +258,18 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(vector<shared_ptr<Ship> > ships, v
         }else{
           game.game_map->at(ship->position)->mark_unsafe(ship);
           direction_queue_original.emplace_back(ship, direction);
-          //log::log("stay stil; " + to_string(ship->id));
+          // log::log("stay stil; " + to_string(ship->id));
         }
+      }
+
+      for(auto ship : going_home_now){
+        GO_HOME_EFFICIENT[ship->id] = false;
       }
 
       return ships_no_still;
     }else{
       // for(auto& [ship, direction] : direction_queue_temporary){
-      //   //log::log("the end: " + to_string(ship->id));
+      //   log::log("the end: " + to_string(ship->id));
       // }
       direction_queue_original.insert(direction_queue_original.end(), direction_queue_temporary.begin(), direction_queue_temporary.end());
       return {};
