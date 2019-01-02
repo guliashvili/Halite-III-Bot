@@ -76,11 +76,131 @@ bool shouldGoHome(shared_ptr<Ship> ship){
   return ship->halite >= constants::MAX_HALITE*9/10;
 }
 
-Direction goHome(shared_ptr<Ship> ship){
-  auto minDstDropoff = getMinDistanceToDropoff(ship->position, me->all_dropoffs);
-  return greedySquareMove(ship, minDstDropoff.second->position); // TODO might stand still when blocked
+
+
+const int DP_MAX_TURNS = 100;
+tuple<int, Direction, int> dp[DP_MAX_TURNS][64][64];
+
+int DP_MARK = 1;
+
+
+vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall=false){
+  DP_MARK++;
+
+  const auto moves_closer = game.game_map->get_unsafe_moves(ship->position, target);
+  auto y_move = Direction::NORTH;
+  auto x_move = Direction::EAST;
+  if(find(moves_closer.begin(), moves_closer.end(), Direction::SOUTH) != moves_closer.end()){
+    y_move = Direction::SOUTH;
+  }
+  if(find(moves_closer.begin(), moves_closer.end(), Direction::WEST) != moves_closer.end()){
+    x_move = Direction::WEST;
+  }
+
+  dp[0][ship->position.x][ship->position.y] = {ship->halite, Direction::NONE, DP_MARK};
+
+  const int MAX_CUR_TURN = (constants::WIDTH + constants::HEIGHT) * 1.3 / 2;
+  for(int cur_turn = 0; cur_turn < MAX_CUR_TURN; cur_turn++){
+    Position cur_edge_position = ship->position;
+    do{
+
+      Position cur_position = cur_edge_position;
+      do{
+        const auto& cur_dp_state = dp[cur_turn][cur_position.x][cur_position.y];
+        if(get<2>(cur_dp_state) == DP_MARK){
+            vector<Direction> moves = (cur_position == ship->position)?game.game_map->get_safe_moves(ship, target, recall):game.game_map->get_unsafe_moves(ship->position, target);
+            for(auto move : moves){
+              const auto next_pos = cur_position.directional_offset(move);
+              int cur_halite = get<0>(cur_dp_state);
+              int halite_to_grab = game.game_map->at(cur_position)->halite;
+
+              int stay_turns = 0;
+
+              while(1){
+                const int halite_left = cur_halite - halite_to_grab / constants::MOVE_COST_RATIO;
+                if(halite_left >= 0){
+                  const int next_turn = cur_turn + stay_turns + 1;
+                  if(next_turn < MAX_CUR_TURN){
+                    if(get<2>(dp[next_turn][next_pos.x][next_pos.y]) == DP_MARK or get<0>(dp[next_turn][next_pos.x][next_pos.y]) < cur_halite){
+                          if(get<1>(cur_dp_state) == Direction::NONE){
+                            dp[next_turn][next_pos.x][next_pos.y] = {halite_left, (stay_turns>0)?Direction::STILL:move , DP_MARK};
+                          }else{
+                            dp[next_turn][next_pos.x][next_pos.y] = {halite_left, get<1>(cur_dp_state), DP_MARK};
+                          }
+
+                    }
+                  }
+                }
+
+
+                if(cur_halite == constants::MAX_HALITE or halite_to_grab/constants::EXTRACT_RATIO == 0){
+                  break;
+                }
+                stay_turns += 1;
+                cur_halite += (halite_to_grab+constants::EXTRACT_RATIO-1)/constants::EXTRACT_RATIO;
+                cur_halite = min(cur_halite, constants::MAX_HALITE);
+                halite_to_grab -= (halite_to_grab+constants::EXTRACT_RATIO-1)/constants::EXTRACT_RATIO;
+
+              }
+
+            }
+
+
+        }
+
+
+        if(cur_position.y == target.y){
+          break;
+        }
+        cur_position = cur_position.directional_offset(y_move);
+      }while(1);
+
+      if(cur_edge_position.x == target.x){
+        break;
+      }
+      cur_edge_position = cur_edge_position.directional_offset(x_move);
+    }while(1);
+  }
+
+
+  vector<tuple<int, Direction, int> > efficient_possibilities;
+  for(int turn = 0; turn < MAX_CUR_TURN; turn++ ){
+    if(get<2>(dp[turn][target.x][target.y]) == DP_MARK){
+      efficient_possibilities.push_back({turn, get<1>(dp[turn][target.x][target.y]),get<0>(dp[turn][target.x][target.y])});
+    }
+  }
+
+  return efficient_possibilities;
+
+
 }
 
+int NUM_OF_MOVES_FROM_HOME[1000] = {0};
+
+Direction goToPointEfficient(shared_ptr<Ship> ship, Position destination){
+  const auto dp_results = compute_dp_walk(ship, destination);
+  if(dp_results.size() == 0){
+    return Direction::STILL;
+  }else{
+    const int num_of_turns_from_home = NUM_OF_MOVES_FROM_HOME[ship->id];
+    pair<double, Direction> best; best.first = -1;
+    for(auto& [steps, direction, halite] : dp_results){
+        double cur_efficiency = double(halite) / (num_of_turns_from_home + steps);
+        if(cur_efficiency > get<0>(best)){
+          best = {cur_efficiency, direction};
+        }
+    }
+    return get<1>(best);
+  }
+
+
+}
+
+Direction goHome(shared_ptr<Ship> ship){
+  auto minDstDropoff = getMinDistanceToDropoff(ship->position, me->all_dropoffs);
+
+  return goToPointEfficient(ship, minDstDropoff.second->position);// TODO might stand still when blocked
+}
 
 vector<tuple<unsigned,Position, double> > _candidates;
 int ship_pair_st[64][64] = {{0}};
@@ -153,7 +273,6 @@ void pair_ships(vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>,
 
 
 // bool GOING_HOME[1000] = {false};
-int NUM_OF_MOVES_FROM_HOME[1000] = {0};
 int AVERAGE_TIME_TO_HOME = 0;
 
 bool should_ship_new_ship(){
@@ -204,6 +323,7 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(vector<shared_ptr<Ship> > ships, v
 
         if(auto recall=isRecallTime(ship)){
           //log::log("recalltime");
+          // goHomeRecall()
           navigate(ship, recall.value(), direction_queue_temporary);
         }else if(GO_HOME_EFFICIENT[ship->id]){
           going_home.push_back(ship);
