@@ -3,6 +3,7 @@
 #include "types.hpp"
 #include "map_cell.hpp"
 #include "constants.hpp"
+#include "genes.hpp"
 
 #include <vector>
 using namespace std;
@@ -13,9 +14,11 @@ namespace hlt {
         int height;
         std::vector<std::vector<MapCell>> cells;
         PlayerId me = -1;
+        shared_ptr<Genes> genes;
 
-        void init(PlayerId me_){
+        void init(PlayerId me_, shared_ptr<Genes> genes_){
           me = me_;
+          genes = genes_;
         }
 
         MapCell* at(const Position& position) {
@@ -72,14 +75,28 @@ namespace hlt {
           return cell->has_structure() && cell->structure->owner == me;
         }
 
-        std::vector<Direction> get_safe_moves(Position& source, const Position& destination, bool recall=false) {
-          auto directions = get_unsafe_moves(source, destination);
+        int _get_min_halite_enemy(const Position& position){
+          int mn = 9999;
+
+          for(auto direction : ALL_CARDINALS){
+            const auto& next_pos = position.directional_offset(direction);
+            if(at(next_pos)->is_occupied() && at(next_pos)->ship->owner != me){
+                mn = min(mn, at(next_pos)->ship->halite);
+            }
+          }
+
+          return mn;
+        }
+        std::vector<Direction> get_safe_moves(shared_ptr<Ship> ship, const Position& destination, bool recall=false) {
+          auto directions = get_unsafe_moves(ship->position, destination);
           std::vector<Direction> safe_directions;
 
           for(auto direction : directions){
-            const auto& next_pos = source.directional_offset(direction);
+            const auto& next_pos = ship->position.directional_offset(direction);
             if(!at(next_pos)->is_occupied() || (recall &&  has_my_structure(next_pos))){
-              safe_directions.push_back(direction);
+              if(ship->halite - _get_min_halite_enemy(next_pos) < genes->collision_caution_margin){
+                safe_directions.push_back(direction);
+              }
             }
           }
           return safe_directions;

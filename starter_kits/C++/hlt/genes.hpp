@@ -8,7 +8,8 @@ namespace hlt {
       greedy_walk_randomisation_margin,
       margin_to_create_new_ship,
       total_halite_margin_substr,
-      ship_spawn_step_margin;
+      ship_spawn_step_margin,
+      collision_caution_margin;
       double average_time_home_decay;
     private:
       template<class T>

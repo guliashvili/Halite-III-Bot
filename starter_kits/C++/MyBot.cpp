@@ -17,7 +17,7 @@
 using namespace std;
 using namespace hlt;
 
-unique_ptr<Genes> genes;
+shared_ptr<Genes> genes;
 Game game;
 shared_ptr<Player> me;
 
@@ -27,7 +27,7 @@ void navigate(const shared_ptr<Ship> ship, const Direction& direction,vector<tup
 }
 
 Direction greedySquareMove(shared_ptr<Ship> ship, Position& target, bool recall=false){
-  auto directions = game.game_map->get_safe_moves(ship->position, target, recall);
+  auto directions = game.game_map->get_safe_moves(ship, target, recall);
   if(directions.size() == 0){
     return Direction::STILL;
   }else if(directions.size() == 1){
@@ -133,7 +133,7 @@ void pair_ships(vector<shared_ptr<Ship> >& ships, vector<tuple<shared_ptr<Ship>,
       continue;
     }
     auto& ship = ships[i];
-    if(pos != ship->position && game.game_map->get_safe_moves(ship->position, pos).size() == 0){
+    if(pos != ship->position && game.game_map->get_safe_moves(ship, pos).size() == 0){
       continue;
     }
 
@@ -283,7 +283,7 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
 
   me = game.me;
   unique_ptr<GameMap>& game_map = game.game_map;
-  game_map->init(me->id);
+  game_map->init(me->id, genes);
 
   int SAVINGS = 0;
 
@@ -327,7 +327,7 @@ int main(int argc, const char* argv[]) {
     // This is a good place to do computationally expensive start-up pre-processing.
     // As soon as you call "ready" function below, the 2 second per turn timer will start.
     game.ready("MyCppBot");
-    genes = make_unique<Genes>(argc, argv);
+    genes = make_shared<Genes>(argc, argv);
     srand(genes->seed);
     //log::log("Successfully created bot! My Player ID is " + to_string(game.my_id) + ". Bot rng seed is " + to_string(genes->seed) + ".");
 

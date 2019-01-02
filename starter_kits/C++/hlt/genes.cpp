@@ -20,6 +20,7 @@ hlt::Genes::Genes(int argc,  const char* argv[]){
       total_halite_margin_substr = 24;
       average_time_home_decay = 1.0/3;
       ship_spawn_step_margin = 60;
+      collision_caution_margin = 200;
     }else{
       seed = Genes::get_arg(0, 10000000, argv[1]);
       extra_time_for_recall = Genes::get_arg(0, 10, argv[2]);
@@ -28,6 +29,7 @@ hlt::Genes::Genes(int argc,  const char* argv[]){
       total_halite_margin_substr = Genes::get_arg(10, 100, argv[5]);
       average_time_home_decay = Genes::get_arg(double(0), double(1), argv[6]);
       ship_spawn_step_margin = Genes::get_arg(0, 200, argv[7]);
+      collision_caution_margin = Genes::get_arg(0, 1000, argv[7]);
     }
 
 
