@@ -84,10 +84,11 @@ tuple<int, Direction, int> dp[DP_MAX_TURNS][64][64];
 int DP_MARK = 1;
 
 
+Position _dp_walk_next_pos;
 vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall=false){
   DP_MARK++;
 
-  log::log(" Ship  " + to_string(ship->id) + " destination " + to_string(target.x) + " " + to_string(target.y));
+  // log::log(" Ship  " + to_string(ship->id) + " destination " + to_string(target.x) + " " + to_string(target.y));
 
   const auto moves_closer = game.game_map->get_unsafe_moves(ship->position, target);
   auto y_move = Direction::NORTH;
@@ -101,7 +102,7 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
 
   dp[0][ship->position.x][ship->position.y] = {ship->halite, Direction::NONE, DP_MARK};
 
-  const int MAX_CUR_TURN = (constants::WIDTH + constants::HEIGHT) * 1.5 / 2;
+  const int MAX_CUR_TURN = (constants::WIDTH + constants::HEIGHT) * 1.3 / 2;
   for(int cur_turn = 0; cur_turn < MAX_CUR_TURN; cur_turn++){
     Position cur_edge_position = ship->position;
     while(1){
@@ -114,7 +115,7 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
             // log::log(to_string(cur_turn) + " " + to_string(cur_position.x) + ":" + to_string(cur_position.y) + "  -  " + " hal " + to_string(get<0>(cur_dp_state)) + " move sizes " + to_string(moves.size()));
 
             for(auto move : moves){
-              const auto& next_pos = cur_position.directional_offset(move);
+              cur_position.directional_offset(_dp_walk_next_pos, move);
               int cur_halite = get<0>(cur_dp_state);
               int halite_to_grab = game.game_map->at(cur_position)->halite;
 
@@ -126,13 +127,13 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
                 if(halite_left >= 0){
                   const int next_turn = cur_turn + stay_turns + 1;
                   if(next_turn < MAX_CUR_TURN){
-                    if(get<2>(dp[next_turn][next_pos.x][next_pos.y]) != DP_MARK or get<0>(dp[next_turn][next_pos.x][next_pos.y]) < halite_left){
+                    if(get<2>(dp[next_turn][_dp_walk_next_pos.x][_dp_walk_next_pos.y]) != DP_MARK or get<0>(dp[next_turn][_dp_walk_next_pos.x][_dp_walk_next_pos.y]) < halite_left){
                           if(get<1>(cur_dp_state) == Direction::NONE){
                             // log::log("upd " + to_string(next_pos.x) + " " + to_string(next_pos.y) + " " + to_string(next_turn));
-                            dp[next_turn][next_pos.x][next_pos.y] = {halite_left, (stay_turns>0)?Direction::STILL:move , DP_MARK};
+                            dp[next_turn][_dp_walk_next_pos.x][_dp_walk_next_pos.y] = {halite_left, (stay_turns>0)?Direction::STILL:move , DP_MARK};
                           }else{
                             // log::log("upd2 " + to_string(next_pos.x) + " " + to_string(next_pos.y) + " " + to_string(next_turn));
-                            dp[next_turn][next_pos.x][next_pos.y] = {halite_left, get<1>(cur_dp_state), DP_MARK};
+                            dp[next_turn][_dp_walk_next_pos.x][_dp_walk_next_pos.y] = {halite_left, get<1>(cur_dp_state), DP_MARK};
                           }
 
                     }
@@ -144,9 +145,10 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
                   break;
                 }
                 stay_turns++;
-                cur_halite += (halite_to_grab+constants::EXTRACT_RATIO-1)/constants::EXTRACT_RATIO;
+                const int extraction = (halite_to_grab+constants::EXTRACT_RATIO-1)/constants::EXTRACT_RATIO;
+                cur_halite += extraction;
                 cur_halite = min(cur_halite, constants::MAX_HALITE);
-                halite_to_grab -= (halite_to_grab+constants::EXTRACT_RATIO-1)/constants::EXTRACT_RATIO;
+                halite_to_grab -= extraction;
 
               }
 
@@ -159,13 +161,13 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
         if(cur_position.y == target.y){
           break;
         }
-        cur_position = cur_position.directional_offset(y_move);
+        cur_position.directional_offset_self(y_move);
       }
 
       if(cur_edge_position.x == target.x){
         break;
       }
-      cur_edge_position = cur_edge_position.directional_offset(x_move);
+      cur_edge_position.directional_offset_self(x_move);
     }
   }
 
@@ -203,11 +205,14 @@ Direction goToPointEfficient(shared_ptr<Ship> ship, Position destination){
 }
 
 Direction goToPointFast(shared_ptr<Ship> ship, Position destination, bool recall=false){
-  const auto dp_results = compute_dp_walk(ship, destination, recall);
+  if(ship->position == destination){
+    return Direction::STILL;
+  }
+
+  const auto& dp_results = compute_dp_walk(ship, destination, recall);
   if(dp_results.size() == 0){
     return Direction::STILL;
   }else{
-
     return (get<1>(dp_results[0])==Direction::NONE)?Direction::STILL:get<1>(dp_results[0]);
   }
 }

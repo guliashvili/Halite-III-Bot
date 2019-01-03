@@ -75,13 +75,14 @@ namespace hlt {
           return cell->has_structure() && cell->structure->owner == me;
         }
 
+
+        Position _min_halite_next_pos;
         int _get_min_halite_enemy(const Position& position){
           int mn = 9999;
-
           for(auto direction : ALL_CARDINALS){
-            const auto& next_pos = position.directional_offset(direction);
-            if(at(next_pos)->is_occupied() && at(next_pos)->ship->owner != me){
-                mn = min(mn, at(next_pos)->ship->halite);
+            position.directional_offset(_min_halite_next_pos, direction);
+            if(at(_min_halite_next_pos)->is_occupied() && at(_min_halite_next_pos)->ship->owner != me){
+                mn = min(mn, at(_min_halite_next_pos)->ship->halite);
             }
           }
 

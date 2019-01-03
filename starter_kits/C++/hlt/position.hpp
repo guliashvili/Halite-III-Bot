@@ -33,7 +33,7 @@ namespace hlt {
             return std::to_string(x) + ':' + std::to_string(y);
         }
 
-        Position directional_offset(Direction d) const {
+        Position directional_offset(const Direction& d) const {
             switch (d) {
                 case Direction::NORTH:
                     return Position{x, (y == 0)?(constants::HEIGHT-1):(y-1)};
@@ -51,6 +51,52 @@ namespace hlt {
             }
         }
 
+        void directional_offset_self(const Direction& d) {
+            switch (d) {
+                case Direction::NORTH:
+                    y = (y == 0)?(constants::HEIGHT-1):(y-1);
+                    break;
+                case Direction::SOUTH:
+                    y = (y == constants::HEIGHT-1)?0:(y+1);
+                    break;
+                case Direction::EAST:
+                    x = (x == constants::WIDTH-1)?0:(x+1);
+                    break;
+                case Direction::WEST:
+                    x= (x == 0)?(constants::WIDTH-1):(x-1);
+                    break;
+                case Direction::STILL:
+                    break;
+                default:
+                    log::log(std::string("Error: directional_offset: unknown direction ") + static_cast<char>(d));
+                    exit(1);
+            }
+        }
+        void directional_offset(Position& position, const Direction& d) const {
+            switch (d) {
+                case Direction::NORTH:
+                    position.y = (y == 0)?(constants::HEIGHT-1):(y-1);
+                    position.x = x;
+                    break;
+                case Direction::SOUTH:
+                    position.y = (y == constants::HEIGHT-1)?0:(y+1);
+                    position.x = x;
+                    break;
+                case Direction::EAST:
+                    position.y = y;
+                    position.x = (x == constants::WIDTH-1)?0:(x+1);
+                    break;
+                case Direction::WEST:
+                    position.y = y;
+                    position.x = (x == 0)?(constants::WIDTH-1):(x-1);
+                    break;
+                case Direction::STILL:
+                    break;
+                default:
+                    log::log(std::string("Error: directional_offset: unknown direction ") + static_cast<char>(d));
+                    exit(1);
+            }
+        }
         std::array<Position, 4> get_surrounding_cardinals() {
             return {{
                 directional_offset(Direction::NORTH), directional_offset(Direction::SOUTH),
