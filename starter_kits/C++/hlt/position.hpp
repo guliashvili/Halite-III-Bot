@@ -91,6 +91,8 @@ namespace hlt {
                     position.x = (x == 0)?(constants::WIDTH-1):(x-1);
                     break;
                 case Direction::STILL:
+                    position.y = y;
+                    position.x = x;
                     break;
                 default:
                     log::log(std::string("Error: directional_offset: unknown direction ") + static_cast<char>(d));
