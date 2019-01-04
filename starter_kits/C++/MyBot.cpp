@@ -79,7 +79,7 @@ bool shouldGoHome(shared_ptr<Ship> ship){
 
 
 const int DP_MAX_TURNS = 100;
-tuple<int, Direction, int> dp[DP_MAX_TURNS][64][64];
+tuple<int, Direction, int> dp[64][64][DP_MAX_TURNS];
 
 int DP_MARK = 1;
 
@@ -100,61 +100,74 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
     x_move = Direction::WEST;
   }
 
-  dp[0][ship->position.x][ship->position.y] = {ship->halite, Direction::NONE, DP_MARK};
+  dp[ship->position.x][ship->position.y][0] = {ship->halite, Direction::NONE, DP_MARK};
 
-  const int MAX_CUR_TURN = (constants::WIDTH + constants::HEIGHT) * 1.3 / 2;
-  for(int cur_turn = 0; cur_turn < MAX_CUR_TURN; cur_turn++){
+  const int MAX_CUR_TURN = (constants::WIDTH + constants::HEIGHT) * 1.5 / 2;
+
     Position cur_edge_position = ship->position;
+    int edge_dist = 0;
     while(1){
 
       Position cur_position = cur_edge_position;
+      int cur_dist = edge_dist;
       while(1){
-        const auto& cur_dp_state = dp[cur_turn][cur_position.x][cur_position.y];
-        if(get<2>(cur_dp_state) == DP_MARK){
-            const vector<Direction>& moves = (cur_position == ship->position)?game.game_map->get_safe_moves(ship, target, recall):game.game_map->get_unsafe_moves(cur_position, target);
-            // log::log(to_string(cur_turn) + " " + to_string(cur_position.x) + ":" + to_string(cur_position.y) + "  -  " + " hal " + to_string(get<0>(cur_dp_state)) + " move sizes " + to_string(moves.size()));
+        bool found_some = false;
+        const vector<Direction>& moves = (cur_position == ship->position)?game.game_map->get_safe_moves(ship, target, recall):game.game_map->get_unsafe_moves(cur_position, target);
+        vector<tuple< Direction, Position, int> > move_pos;
+        move_pos.reserve(moves.size());
+        for(auto move : moves){
+          move_pos.emplace_back(move, cur_position.directional_offset(move), game.game_map->at(cur_position)->halite);
+        }
+        for(int cur_turn = cur_dist; cur_turn < MAX_CUR_TURN; cur_turn++){
+          const auto& cur_dp_state = dp[cur_position.x][cur_position.y][cur_turn];
 
-            for(auto move : moves){
-              cur_position.directional_offset(_dp_walk_next_pos, move);
-              int cur_halite = get<0>(cur_dp_state);
-              int halite_to_grab = game.game_map->at(cur_position)->halite;
+          if(get<2>(cur_dp_state) == DP_MARK){
+              found_some = true;
+              // log::log(to_string(cur_turn) + " " + to_string(cur_position.x) + ":" + to_string(cur_position.y) + "  -  " + " hal " + to_string(get<0>(cur_dp_state)) + " move sizes " + to_string(moves.size()));
 
-              int stay_turns = 0;
+              for(auto& [move, _dp_walk_next_pos, halite_to_grab] : move_pos){
+                int cur_halite = get<0>(cur_dp_state);
+                int stay_turns = 0;
 
 
-              while(1){
-                const int halite_left = cur_halite - halite_to_grab / constants::MOVE_COST_RATIO;
-                if(halite_left >= 0){
-                  const int next_turn = cur_turn + stay_turns + 1;
-                  if(next_turn < MAX_CUR_TURN){
-                    if(get<2>(dp[next_turn][_dp_walk_next_pos.x][_dp_walk_next_pos.y]) != DP_MARK or get<0>(dp[next_turn][_dp_walk_next_pos.x][_dp_walk_next_pos.y]) < halite_left){
-                          if(get<1>(cur_dp_state) == Direction::NONE){
-                            // log::log("upd " + to_string(next_pos.x) + " " + to_string(next_pos.y) + " " + to_string(next_turn));
-                            dp[next_turn][_dp_walk_next_pos.x][_dp_walk_next_pos.y] = {halite_left, (stay_turns>0)?Direction::STILL:move , DP_MARK};
-                          }else{
-                            // log::log("upd2 " + to_string(next_pos.x) + " " + to_string(next_pos.y) + " " + to_string(next_turn));
-                            dp[next_turn][_dp_walk_next_pos.x][_dp_walk_next_pos.y] = {halite_left, get<1>(cur_dp_state), DP_MARK};
-                          }
+                while(1){
+                  const int halite_left = cur_halite - halite_to_grab / constants::MOVE_COST_RATIO;
+                  if(halite_left >= 0){
+                    const int next_turn = cur_turn + stay_turns + 1;
+                    if(next_turn < MAX_CUR_TURN){
+                      if(get<2>(dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn]) != DP_MARK or get<0>(dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn]) < halite_left){
+                            if(get<1>(cur_dp_state) == Direction::NONE){
+                              // log::log("upd " + to_string(next_pos.x) + " " + to_string(next_pos.y) + " " + to_string(next_turn));
+                              dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn] = {halite_left, (stay_turns>0)?Direction::STILL:move , DP_MARK};
+                            }else{
+                              // log::log("upd2 " + to_string(next_pos.x) + " " + to_string(next_pos.y) + " " + to_string(next_turn));
+                              dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn] = {halite_left, get<1>(cur_dp_state), DP_MARK};
+                            }
 
+                      }
                     }
                   }
-                }
 
 
-                if(cur_halite == constants::MAX_HALITE or halite_to_grab/constants::EXTRACT_RATIO == 0){
-                  break;
+                  if(cur_halite == constants::MAX_HALITE or halite_to_grab/constants::EXTRACT_RATIO == 0){
+                    break;
+                  }
+                  stay_turns++;
+                  const int extraction = (halite_to_grab+constants::EXTRACT_RATIO-1)/constants::EXTRACT_RATIO;
+                  cur_halite += extraction;
+                  cur_halite = min(cur_halite, constants::MAX_HALITE);
+                  halite_to_grab -= extraction;
+
                 }
-                stay_turns++;
-                const int extraction = (halite_to_grab+constants::EXTRACT_RATIO-1)/constants::EXTRACT_RATIO;
-                cur_halite += extraction;
-                cur_halite = min(cur_halite, constants::MAX_HALITE);
-                halite_to_grab -= extraction;
 
               }
 
-            }
 
-
+          }else{
+            if(found_some){
+               break;
+             }
+          }
         }
 
 
@@ -162,24 +175,24 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
           break;
         }
         cur_position.directional_offset_self(y_move);
+        cur_dist++;
       }
 
       if(cur_edge_position.x == target.x){
         break;
       }
       cur_edge_position.directional_offset_self(x_move);
+      edge_dist++;
     }
-  }
+
 
 
   vector<tuple<int, Direction, int> > efficient_possibilities;
   for(int turn = 0; turn < MAX_CUR_TURN; turn++ ){
-    if(get<2>(dp[turn][target.x][target.y]) == DP_MARK){
-      efficient_possibilities.push_back({turn, get<1>(dp[turn][target.x][target.y]),get<0>(dp[turn][target.x][target.y])});
+    if(get<2>(dp[target.x][target.y][turn]) == DP_MARK){
+      efficient_possibilities.push_back({turn, get<1>(dp[target.x][target.y][turn]),get<0>(dp[target.x][target.y][turn])});
     }
   }
-
-log::log("\n\n\n");
   return efficient_possibilities;
 
 
@@ -420,7 +433,7 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(vector<shared_ptr<Ship> > ships, v
 bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
   using namespace std::chrono;
 
-  // high_resolution_clock::time_point t1 = high_resolution_clock::now();
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
   me = game.me;
   unique_ptr<GameMap>& game_map = game.game_map;
@@ -456,7 +469,7 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
       NUM_OF_MOVES_FROM_HOME[ship->id]++;
   }
 
-  //log::log("doStep duration: " + to_string(duration_cast<duration<double>>(high_resolution_clock::now() - t1).count()) + " num: " + to_string(num_of_turns)  + " ships: " + to_string(me->ships.size()));
+  log::log("doStep duration: " + to_string(duration_cast<duration<double>>(high_resolution_clock::now() - t1).count())  + " ships: " + to_string(me->ships.size()));
   auto ret = me->halite - SAVINGS >= constants::SHIP_COST &&  !(game_map->at(me->shipyard->position)->is_occupied()) && should_ship_new_ship();
   return ret;
 }

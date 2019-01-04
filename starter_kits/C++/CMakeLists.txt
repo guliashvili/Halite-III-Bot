@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -oFast -g -Wall -Wextra -Wno-unused-function -flto -pedantic -fno-signed-zeros -fno-trapping-math")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -oFast -g -Wall -Wextra -Wno-unused-function -pedantic ")
 include_directories(${CMAKE_SOURCE_DIR}/hlt)
 
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
