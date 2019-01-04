@@ -16,10 +16,16 @@
 
 using namespace std;
 using namespace hlt;
+using namespace std::chrono;
 
 shared_ptr<Genes> genes;
 Game game;
 shared_ptr<Player> me;
+high_resolution_clock::time_point t1;
+
+int get_milisecond_left(){
+  return 2000 - duration_cast<std::chrono::milliseconds>(high_resolution_clock::now() - t1).count();
+}
 
 void navigate(const shared_ptr<Ship> ship, const Direction& direction,vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
   game.game_map->navigate(ship, direction);
@@ -86,7 +92,12 @@ int DP_MARK = 1;
 
 Position _dp_walk_next_pos;
 vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall=false){
+  if(get_milisecond_left() < 500){
+    return {{0,greedySquareMove(ship, target, recall),0}};
+  }
+
   DP_MARK++;
+
 
   // log::log(" Ship  " + to_string(ship->id) + " destination " + to_string(target.x) + " " + to_string(target.y));
 
@@ -136,7 +147,7 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
                   if(halite_left >= 0){
                     const int next_turn = cur_turn + stay_turns + 1;
                     if(next_turn < MAX_CUR_TURN){
-                      if(get<2>(dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn]) != DP_MARK or get<0>(dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn]) < halite_left){
+                      if(get<2>(dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn]) != DP_MARK || get<0>(dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn]) < halite_left){
                             if(get<1>(cur_dp_state) == Direction::NONE){
                               // log::log("upd " + to_string(next_pos.x) + " " + to_string(next_pos.y) + " " + to_string(next_turn));
                               dp[_dp_walk_next_pos.x][_dp_walk_next_pos.y][next_turn] = {halite_left, (stay_turns>0)?Direction::STILL:move , DP_MARK};
@@ -150,7 +161,7 @@ vector<tuple<int, Direction, int> > compute_dp_walk(shared_ptr<Ship> ship, Posit
                   }
 
 
-                  if(cur_halite == constants::MAX_HALITE or halite_to_grab/constants::EXTRACT_RATIO == 0){
+                  if(cur_halite == constants::MAX_HALITE || halite_to_grab/constants::EXTRACT_RATIO == 0){
                     break;
                   }
                   stay_turns++;
@@ -432,9 +443,9 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(vector<shared_ptr<Ship> > ships, v
 }
 
 bool doStep(vector<tuple<shared_ptr<Ship>, Direction>>& direction_queue){
-  using namespace std::chrono;
 
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
+  t1 = high_resolution_clock::now();
 
   me = game.me;
   unique_ptr<GameMap>& game_map = game.game_map;
