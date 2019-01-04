@@ -91,6 +91,7 @@ std::optional<Direction> isRecallTime(shared_ptr<Ship> ship) {
 }
 
 bool shouldGoHome(shared_ptr<Ship> ship) {
+  // Heuristic: return home with halite ship if collected >= 900
   return ship->halite >= constants::MAX_HALITE * 9 / 10;
 }
 
@@ -382,7 +383,9 @@ bool should_ship_new_ship() {
              genes->ship_spawn_step_margin;
 }
 
+// boolean flag telling is ship is currently going home (to shipyard)
 bool GO_HOME_EFFICIENT[1000] = {false};
+
 vector<shared_ptr<Ship>> oplock_doStepNoStill(
     vector<shared_ptr<Ship>> ships,
     vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue_original) {
@@ -399,13 +402,14 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(
                getMinDistanceToDropoff(rhs->position, game.me->all_dropoffs));
   });
   for (const auto &ship : ships) {
+
+    // returned to home shipyard
     if (game.game_map->has_my_structure(ship->position)) {
       GO_HOME_EFFICIENT[ship->id] = false;
     }
 
+    // time to return home at the end of the game
     if (auto recall = isRecallTime(ship)) {
-      // log::log("recalltime");
-      // goHomeRecall(ship, recall.value())
       navigate(ship, recall.value(), direction_queue_temporary);
     } else if (GO_HOME_EFFICIENT[ship->id]) {
       going_home.push_back(ship);
@@ -461,7 +465,6 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(
       } else {
         game.game_map->at(ship->position)->mark_unsafe(ship);
         direction_queue_original.emplace_back(ship, direction);
-        // log::log("stay stil; " + to_string(ship->id));
       }
     }
 
@@ -489,8 +492,6 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
   unique_ptr<GameMap> &game_map = game.game_map;
   game_map->init(me->id, genes);
 
-  int SAVINGS = 0;
-
   vector<shared_ptr<Ship>> ships;
 
   for (const auto &ship : me->ships) {
@@ -502,7 +503,7 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
           AVERAGE_TIME_TO_HOME * genes->average_time_home_decay +
           NUM_OF_MOVES_FROM_HOME[ship->id] *
               (1 - genes->average_time_home_decay);
-      NUM_OF_MOVES_FROM_HOME[ship->id] = 0;
+      NUM_OF_MOVES_FROM_HOME[ship->id] = 0;  // at home (shipyard)
     }
     if (!game_map->can_move(ship)) {
       navigate(ship, Direction::STILL, direction_queue);
@@ -512,13 +513,12 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
     }
   }
 
-  // int num_of_turns = 0;
   while ((ships = oplock_doStepNoStill(ships, direction_queue)).size() != 0) {
-    // num_of_turns++;
-    // log::log("\n\n");
   }
 
   for (const auto &ship : me->ships) {
+    // ship is always going away from home
+    // when going to target point to collect halite
     NUM_OF_MOVES_FROM_HOME[ship->id]++;
   }
 
@@ -527,7 +527,7 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
                          high_resolution_clock::now() - t1)
                          .count()) +
            " ships: " + to_string(me->ships.size()));
-  auto ret = me->halite - SAVINGS >= constants::SHIP_COST &&
+  auto ret = me->halite >= constants::SHIP_COST &&
              !(game_map->at(me->shipyard->position)->is_occupied()) &&
              should_ship_new_ship();
   return ret;
