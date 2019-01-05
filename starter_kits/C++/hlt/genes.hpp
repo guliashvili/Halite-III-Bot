@@ -10,7 +10,9 @@ namespace hlt {
       total_halite_margin_substr,
       ship_spawn_step_margin,
       collision_caution_margin;
-      double average_time_home_decay;
+      double average_time_home_decay,
+      average_efficiency_per_decay,
+      average_halite_per_trip_decay;
     private:
       template<class T>
       static T get_arg(T s, T e, const char* args) ;
