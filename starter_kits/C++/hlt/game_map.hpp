@@ -96,7 +96,7 @@ namespace hlt {
 
           for(auto direction : directions){
             ship->position.directional_offset(_safe_moves_position, direction);
-            if(!at(_safe_moves_position)->is_occupied() || (recall &&  has_my_structure(_safe_moves_position))){
+            if(!at(_safe_moves_position)->is_occupied() || (at(_safe_moves_position)->ship->owner != me && has_my_structure(_safe_moves_position)) || (recall &&  has_my_structure(_safe_moves_position))){
               if(ship->halite - _get_min_halite_enemy(_safe_moves_position) < genes->collision_caution_margin){
                 safe_directions.push_back(direction);
               }
