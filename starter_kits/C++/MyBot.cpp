@@ -403,7 +403,7 @@ Position find_dropoff_place(){
   Position pos;
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
     for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
-      if(game.game_map->at(pos)->has_structure()){
+      if(game.game_map->at(pos)->has_structure() || faking_dropoff[pos.x][pos.y]){
         continue;
       }
       const int effect_distance = constants::WIDTH / game.players.size() / 4;
@@ -545,13 +545,18 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   game_map->init(me->id, genes);
 
   if(isTimeToDropoff()){
-    savings += 4000;
+    savings += constants::DROPOFF_COST;
     Position pos = find_dropoff_place();
     faking_dropoff[pos.x][pos.y] = true;
     faking_dropoffs.push_back(pos);
   }
 
   for(auto &position : faking_dropoffs){
+    if(game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id){
+      faking_dropoff[position.x][position.y] = false;
+      position = find_dropoff_place();
+      faking_dropoff[position.x][position.y] = true;
+    }
     game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
     game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
     game.game_map->at(position)->structure = game.me->dropoffs.back();
@@ -571,9 +576,9 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
       NUM_OF_MOVES_FROM_HOME[ship->id] = 0;  // at home (shipyard)
     }
     if (game_map->has_my_structure(ship->position) && faking_dropoff[ship->position.x][ship->position.y]){
-      if(me->halite >= 4000){
-        me->halite -= 4000;
-        savings -= 4000;
+      if(me->halite >= constants::DROPOFF_COST){
+        me->halite -= constants::DROPOFF_COST;
+        savings -= constants::DROPOFF_COST;
         faking_dropoff[ship->position.x][ship->position.y] = false;
         faking_dropoffs.erase(std::remove(faking_dropoffs.begin(), faking_dropoffs.end(), ship->position), faking_dropoffs.end());
         constructions.push_back(ship->make_dropoff());
