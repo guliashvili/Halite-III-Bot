@@ -109,7 +109,7 @@ int DP_MARK = 1;
 Position _dp_walk_next_pos;
 vector<tuple<int, Direction, int>>
 compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
-  if (get_milisecond_left() < 500) {
+  if (get_milisecond_left() < 10*game.me->ships.size()) {
     return {{0, greedySquareMove(ship, target, recall), 0}};
   }
 
