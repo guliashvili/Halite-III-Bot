@@ -393,7 +393,7 @@ bool should_ship_new_ship() {
 
 vector<Position> faking_dropoffs;
 bool isTimeToDropoff(){
-  return game.turn_number > 50 && game.me->ships.size() > 15 && (faking_dropoffs.size() + game.me->dropoffs.size()) == 0;
+  return game.turn_number > 50 && game.me->ships.size() > 20 && (faking_dropoffs.size() + game.me->dropoffs.size()) == 0;
 }
 
 Position find_dropoff_place(){
@@ -552,7 +552,7 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   }
 
   for(auto &position : faking_dropoffs){
-    if(game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id){
+    if(me->halite < 3000 || (game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id)){
       faking_dropoff[position.x][position.y] = false;
       position = find_dropoff_place();
       faking_dropoff[position.x][position.y] = true;
