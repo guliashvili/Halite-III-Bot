@@ -22,6 +22,10 @@ Game game;
 shared_ptr<Player> me;
 high_resolution_clock::time_point t1;
 
+// Opponent analytics
+
+// end opponent analytics
+
 int get_milisecond_left() {
   return 2000 - duration_cast<std::chrono::milliseconds>(
                     high_resolution_clock::now() - t1)
@@ -101,7 +105,7 @@ bool shouldGoHome(shared_ptr<Ship> ship) {
   return ship->halite >= constants::MAX_HALITE * 9 / 10;
 }
 
-const int DP_MAX_TURNS = 100;
+const int DP_MAX_TURNS = 64+64+1;
 tuple<int, Direction, int> dp[64][64][DP_MAX_TURNS];
 
 int DP_MARK = 1;
@@ -131,7 +135,7 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
   dp[ship->position.x][ship->position.y][0] = {ship->halite, Direction::NONE,
                                                DP_MARK};
 
-  const int MAX_CUR_TURN = (constants::WIDTH + constants::HEIGHT) * 1.5 / 2;
+  const int MAX_CUR_TURN = (constants::WIDTH + constants::HEIGHT);
 
   Position cur_edge_position = ship->position;
   int edge_dist = 0;
@@ -437,6 +441,7 @@ Position find_dropoff_place(){
 // boolean flag telling is ship currently going home (to shipyard)
 bool GO_HOME_EFFICIENT[1000] = {false};
 
+// int reset_counter;
 vector<shared_ptr<Ship>> oplock_doStepNoStill(
     vector<shared_ptr<Ship>> ships,
     vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue_original) {
@@ -497,12 +502,14 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(
     }
   }
 
-  was_blocker =
-      was_blocker ||
-      std::find_if(direction_queue_temporary.begin(),
-                   direction_queue_temporary.end(), [](const auto &element) {
-                     return get<1>(element) == Direction::STILL;
-                   }) != direction_queue_temporary.end();
+  if(!was_blocker){
+    was_blocker =
+        std::find_if(direction_queue_temporary.begin(),
+                     direction_queue_temporary.end(), [&](const auto &element) {
+                       return get<1>(element) == Direction::STILL && game.game_map->at(get<0>(element)->position)->collision;
+                     }) != direction_queue_temporary.end();
+    // reset_counter+=was_blocker;
+  }
 
   if (was_blocker) {
     ships_no_still.reserve(ships.size());
@@ -587,14 +594,20 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
       }
     }else if (!game_map->can_move(ship)) {
       navigate(ship, Direction::STILL, direction_queue);
-    } else {
+    }else if(game_map->get_safe_moves_around(ship, !!isRecallTime(ship)).size() == 0) {
+        navigate(ship, Direction::STILL, direction_queue);
+    }else {
       game.game_map->at(ship->position)->mark_safe();
       ships.push_back(ship);
     }
   }
 
+  // reset_counter = 0;
   while ((ships = oplock_doStepNoStill(ships, direction_queue)).size() != 0) {
   }
+  // if(reset_counter){
+  //   log::log("reset_counter: " + to_string(reset_counter));
+  // }
 
   for (const auto &ship : me->ships) {
     // ship is always going away from home
