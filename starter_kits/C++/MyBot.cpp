@@ -484,7 +484,7 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(
   }
 }
 
-bool doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
+vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
 
   t1 = high_resolution_clock::now();
 
@@ -527,10 +527,15 @@ bool doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
                          high_resolution_clock::now() - t1)
                          .count()) +
            " ships: " + to_string(me->ships.size()));
-  auto ret = me->halite >= constants::SHIP_COST &&
+  auto spawn_ship = me->halite >= constants::SHIP_COST &&
              !(game_map->at(me->shipyard->position)->is_occupied()) &&
              should_ship_new_ship();
-  return ret;
+
+  vector<Command> constructions;
+  if(spawn_ship){
+    constructions.push_back(command::spawn_ship());
+  }
+  return constructions;
 }
 
 int main(int argc, const char *argv[]) {
@@ -547,19 +552,15 @@ int main(int argc, const char *argv[]) {
   // to_string(game.my_id) + ". Bot rng seed is " + to_string(genes->seed) +
   // ".");
 
-  vector<Command> command_queue;
+  ;
   vector<tuple<shared_ptr<Ship>, Direction>> direction_queue;
   while (1) {
     game.update_frame();
 
-    command_queue.resize(0);
-    command_queue.reserve(game.me->ships.size() + 1);
     direction_queue.resize(0);
     direction_queue.reserve(game.me->ships.size());
 
-    if (doStep(direction_queue)) {
-      command_queue.push_back(command::spawn_ship());
-    }
+    vector<Command> command_queue = doStep(direction_queue);
 
     for (auto &[ship, direction] : direction_queue) {
       command_queue.push_back(command::move(ship->id, direction));
