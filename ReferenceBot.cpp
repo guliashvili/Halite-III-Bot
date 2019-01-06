@@ -25,10 +25,11 @@
 #include <tuple>
 #include <unordered_map>
 #include <execinfo.h>
-#include <signal.h>
-#include <stdlib.h>
+#include <csignal>
+#include <cstdlib>
 #include <unistd.h>
-#include<stdio.h>
+#include <cstdio>
+#include <cmath>
 
 
 void handler(int sig) {
@@ -63,8 +64,8 @@ vector<Position> opponents_ships;
 vector<Position> opponents_dropoffs;
 
 void updatePositionsOfOpponentsStuff() {
-  opponents_ships = {};
-  opponents_dropoffs = {};
+  opponents_ships.clear();
+  opponents_dropoffs.clear();
   for (auto player : game.players) {
     if(player->id == game.me->id){
       continue;
@@ -83,16 +84,9 @@ void updatePositionsOfOpponentsStuff() {
 double getDropoffImpact(Position pos, Position dropoff){
   const int num_of_players = game.players.size();
   int distance = game.game_map->calculate_distance(pos, dropoff);
-  if (distance <= constants::HEIGHT / num_of_players / 5) {
-    return 2.0;
-  } else if (distance <= constants::HEIGHT / num_of_players / 4) {
-    return 1.5;
-  } else if (distance <= constants::HEIGHT / num_of_players / 3) {
-    return 1.1;
-  }else{
-    return 1;
-  }
+  return 2 - pow(genes->dropoff_effect_decay_base, distance);
 }
+
 double impactOfOpponentsDropoffs(Position pos) {
   double impact = 1.0;
   for (auto dropoff : opponents_dropoffs) {
