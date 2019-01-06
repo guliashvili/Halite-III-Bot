@@ -47,6 +47,38 @@ shared_ptr<Player> me;
 high_resolution_clock::time_point t1;
 
 // Opponent analytics
+vector<Position> opponents_ships;
+vector<Position> opponents_dropoffs;
+
+void updatePositionsOfOpponentsStuff() {
+  opponents_ships = {};
+  opponents_dropoffs = {};
+  for (auto player : game.players) {
+    for (auto dropoff : player->all_dropoffs) {
+      opponents_dropoffs.push_back(dropoff->position);
+    }
+    for (auto ship : player->ships) {
+      opponents_ships.push_back(ship->position);
+    }
+  }
+}
+
+// [1.0, 2 ^ (PLAYERS-1)] - impact of opponents dropoffs on the area
+double impactOfOpponentsDropoffs(Position pos) {
+  double impact = 1.0;
+  int num_of_players = game.players.size();
+  for (auto dropoff : opponents_dropoffs) {
+    int distance = game.game_map->calculate_distance(pos, dropoff);
+    if (distance <= constants::HEIGHT / num_of_players / 5) {
+      impact *= 2.0;
+    } else if (distance <= constants::HEIGHT / num_of_players / 4) {
+      impact *= 1.5;
+    } else if (distance <= constants::HEIGHT / num_of_players / 3) {
+      impact *= 1.1;
+    }
+  }
+  return impact;
+}
 
 // end opponent analytics
 
@@ -427,7 +459,7 @@ bool isTimeToDropoff(){
 
 Position find_dropoff_place(){
 
-  pair<int, Position> best_dropoff;
+  pair<double, Position> best_dropoff;
   best_dropoff.first = -1;
   Position pos;
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
@@ -437,13 +469,15 @@ Position find_dropoff_place(){
       }
       const int effect_distance = constants::WIDTH / game.players.size() / 4;
 
-      int total_halite_in_range = 0;
+      double total_halite_in_range = 0;
       for(int delta_x = -effect_distance; delta_x < effect_distance; delta_x++){
         for(int delta_y = -(effect_distance-abs(delta_x)); delta_y < (effect_distance-abs(delta_x)); delta_y++){
           Position cur_cell( (((x+delta_x)%constants::WIDTH)+constants::WIDTH)%constants::WIDTH,  (((y+delta_y)%constants::HEIGHT)+constants::HEIGHT)%constants::HEIGHT);
           total_halite_in_range += game.game_map->at(cur_cell)->halite;
         }
       }
+
+      total_halite_in_range /= impactOfOpponentsDropoffs(pos);
 
       if(total_halite_in_range > get<0>(best_dropoff)){
         best_dropoff = {total_halite_in_range, pos};
@@ -454,13 +488,6 @@ Position find_dropoff_place(){
   }
 
   return get<1>(best_dropoff);
-
-  // for(auto player : game.players){
-  //   for(auto dropoff : player->all_dropoffs){
-  //     for(int delta_x = -)
-  //     min_dst = min(min_dst, game.game_map->calculate_distance(candidate_pos, dropoff->position))
-  //   }
-  // }
 }
 
 // boolean flag telling is ship currently going home (to shipyard)
@@ -575,6 +602,8 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   me = game.me;
   unique_ptr<GameMap> &game_map = game.game_map;
   game_map->init(me->id, genes);
+
+  updatePositionsOfOpponentsStuff();
 
   if(isTimeToDropoff()){
     savings += constants::DROPOFF_COST;
