@@ -54,6 +54,10 @@ void updatePositionsOfOpponentsStuff() {
   opponents_ships = {};
   opponents_dropoffs = {};
   for (auto player : game.players) {
+    if(player->id == game.me->id){
+      continue;
+    }
+
     for (auto dropoff : player->all_dropoffs) {
       opponents_dropoffs.push_back(dropoff->position);
     }
