@@ -713,7 +713,7 @@ int main(int argc, const char *argv[]) {
   // This is a good place to do computationally expensive start-up
   // pre-processing. As soon as you call "ready" function below, the 2 second
   // per turn timer will start.
-  game.ready("MyCppBot");
+  game.ready("ReferenceBot");
   genes = make_shared<Genes>(argc, argv);
   srand(genes->seed);
   // log::log("Successfully created bot! My Player ID is " +
