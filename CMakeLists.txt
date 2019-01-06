@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 2.8)
 
 project(MyBot)
+add_custom_command ( OUTPUT MyBot
+                     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/installtmp.sh
+                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/)
 
 
-if(MINGW)
-    target_link_libraries(MyBot -static)
-endif()
+add_custom_target(
+  BuildDocs ALL
+  DEPENDS MyBot
+)
