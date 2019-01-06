@@ -68,18 +68,23 @@ void updatePositionsOfOpponentsStuff() {
 }
 
 // [1.0, 2 ^ (PLAYERS-1)] - impact of opponents dropoffs on the area
+double getDropoffImpact(Position pos, Position dropoff){
+  const int num_of_players = game.players.size();
+  int distance = game.game_map->calculate_distance(pos, dropoff);
+  if (distance <= constants::HEIGHT / num_of_players / 5) {
+    return 2.0;
+  } else if (distance <= constants::HEIGHT / num_of_players / 4) {
+    return 1.5;
+  } else if (distance <= constants::HEIGHT / num_of_players / 3) {
+    return 1.1;
+  }else{
+    return 1;
+  }
+}
 double impactOfOpponentsDropoffs(Position pos) {
   double impact = 1.0;
-  int num_of_players = game.players.size();
   for (auto dropoff : opponents_dropoffs) {
-    int distance = game.game_map->calculate_distance(pos, dropoff);
-    if (distance <= constants::HEIGHT / num_of_players / 5) {
-      impact *= 2.0;
-    } else if (distance <= constants::HEIGHT / num_of_players / 4) {
-      impact *= 1.5;
-    } else if (distance <= constants::HEIGHT / num_of_players / 3) {
-      impact *= 1.1;
-    }
+    impact *= getDropoffImpact(pos, dropoff);
   }
   return impact;
 }

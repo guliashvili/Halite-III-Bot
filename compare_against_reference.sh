@@ -6,7 +6,7 @@ if [[ `uname -a | grep Linux` ]] ; then
 fi
 
 g++ -std=c++17 -march=native -oFast MyBot.cpp hlt/*.cpp -o MyBot
-g++ -std=c++17 -march=native -oFast MyBot.cpp hltref/*.cpp -o ReferenceBot
+g++ -std=c++17 -march=native -oFast ReferenceBot.cpp hltref/*.cpp -o ReferenceBot
 ./$CMD --replay-directory replays/ -vvv --width 32 --height 32 "./MyBot" "./ReferenceBot"
 ./$CMD --replay-directory replays/ -vvv --width 48 --height 48 "./MyBot" "./ReferenceBot"
 ./$CMD --replay-directory replays/ -vvv --width 56 --height 56 "./MyBot" "./ReferenceBot"
