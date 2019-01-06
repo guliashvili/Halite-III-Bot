@@ -1,3 +1,11 @@
+MyBot
+ReferenceBot
+Makefile
+*.hlt
+*.log
+*~
+*.nix
+
 ###################
 ## Visual Studio ##
 ###################

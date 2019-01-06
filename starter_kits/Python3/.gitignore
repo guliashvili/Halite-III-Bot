@@ -1,7 +1,0 @@
-*.hlt
-*.log
-*.pyc
-*.pyo
-__pycache__/
-*~
-*.pkl
