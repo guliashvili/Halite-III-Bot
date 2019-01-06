@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-set -e
-/usr/local/bin/g++-8 -std=c++17  -fprofile-generate *.cpp hlt/*.cpp -o MyBotProfile
-g++ -std=c++17 -march=native -oFast -flto *.cpp hlt/*.cpp -o MyBot
+g++ -std=c++17 -march=native -oFast -flto  -fprofile-generate=prof *.cpp hlt/*.cpp -o MyBotProfile
+g++ -std=c++17 -march=native -oFast -flto *.cpp hlt/*.cpp -o MyBotTmp
 
-./halite --replay-directory replays/ -vvv --width 32 --height 32 "./MyBotProfile" "./MyBot"
+./halite --replay-directory replays/ -vvv --width 64 --height 64 "./MyBotProfile" "./MyBotTmp"
+
+g++ -std=c++17 -march=native -oFast -flto  --fprofile-use=prof *.cpp hlt/*.cpp -o MyBotProfile

@@ -1,17 +1,8 @@
 #!/usr/bin/env bash
 
-set -e
+g++-7 -std=c++17 -march=native -oFast -flto -fprofile-generate=prof MyBot.cpps hlt/*.cpp -o MyBotProfile
+g++-7 -std=c++17 -march=native -oFast -flto MyBot.cpps hlt/*.cpp -o MyBotTmp
 
-mv CMakeLists.txt CMakeLists.txtbackup
-cp CMakeListsProfile.txt CMakeLists.txt
+./haliteLinux --no-timeout --no-replay --no-logs --width 64 --height 64 "./MyBotProfile" "./MyBotTmp"
 
-cmake .
-make
-mv MyBot MyBotReference1
-
-make clean
-cmake -DCMAKE_CXX_FLAGS=-fprofile-generate -DCMAKE_C_COMPILER=/usr/local/bin/gcc-8 -DCMAKE_CXX_COMPILER=/usr/local/bin/g++-8 .
-make
-./halite --replay-directory replays/ -vvv --width 64 --height 64 "./MyBot" "./MyBotReference1"
-
-mv CMakeLists.txtbackup CMakeLists.txt
+g++-7 -std=c++17 -march=native -oFast -flto  -fprofile-use=prof MyBot.cpps hlt/*.cpp -o MyBot
