@@ -141,7 +141,7 @@ bool shouldGoHome(shared_ptr<Ship> ship) {
   return ship->halite >= constants::MAX_HALITE * 9 / 10;
 }
 
-const int DP_MAX_TURNS = 100;
+const int DP_MAX_TURNS = 3*64;
 tuple<int, Direction, int> dp[64][64][DP_MAX_TURNS];
 
 int DP_MARK = 1;
