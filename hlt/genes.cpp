@@ -17,7 +17,7 @@ hlt::Genes::Genes(int argc,  const char* argv[]){
       extra_time_for_recall = 5;
       greedy_walk_randomisation_margin = 1;
       margin_to_create_new_ship = 1000;
-      total_halite_margin_substr = 24;
+      total_halite_margin_substr = 3;
       average_time_home_decay = 1.0/3;
       ship_spawn_step_margin = 60;
       collision_caution_margin = 200;

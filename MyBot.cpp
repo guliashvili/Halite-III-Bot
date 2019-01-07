@@ -27,7 +27,22 @@ high_resolution_clock::time_point t1;
 vector<Position> opponents_ships;
 vector<Position> opponents_dropoffs;
 
+unique_ptr<Position> analytics_ship_last_pos[1000];
+vector<Direction> analytics_ship_directions[1000];
+int analytics_total_halite = 0;
+
 void updatePositionsOfOpponentsStuff() {
+  analytics_total_halite = 0;
+  {
+    Position position;
+    for (int &i = position.y = 0; i < constants::HEIGHT; i++) {
+      for (int &j = position.x = 0; j < constants::WIDTH; j++) {
+        analytics_total_halite += max(0, game.game_map->at(position)->halite -
+                                   genes->total_halite_margin_substr);
+      }
+    }
+  }
+
   opponents_ships.clear();
   opponents_dropoffs.clear();
   for (auto player : game.players) {
@@ -88,6 +103,7 @@ Direction greedySquareMove(shared_ptr<Ship> ship, Position &target,
         game.game_map->at(ship->position.directional_offset(directions[1]));
     if (a->halite > b->halite) {
       swap(a, b);
+      swap(directions[0], directions[1]);
     }
     if (a->move_cost() >
         ship->halite - game.game_map->at(ship->position)->move_cost()) {
@@ -393,7 +409,6 @@ void pair_ships(vector<shared_ptr<Ship>> &ships,
   }
 }
 
-// bool GOING_HOME[1000] = {false};
 int AVERAGE_TIME_TO_HOME = 0;
 
 bool should_ship_new_ship() {
@@ -402,25 +417,14 @@ bool should_ship_new_ship() {
     return true;
   }
 
-  int total_halite = 0;
-  {
-    Position position;
-    for (int &i = position.y = 0; i < constants::HEIGHT; i++) {
-      for (int &j = position.x = 0; j < constants::WIDTH; j++) {
-        total_halite += max(0, game.game_map->at(position)->halite -
-                                   genes->total_halite_margin_substr);
-      }
-    }
-  }
-
   int total_ships_count = 0;
   for (const auto &player : game.players) {
     total_ships_count += player->ships.size();
   }
 
-  int current_halite_prediction = total_halite * total_me / total_ships_count;
+  int current_halite_prediction = analytics_total_halite * total_me / total_ships_count;
   int next_halite_prediction =
-      total_halite * (total_me + 1) / (total_ships_count + 1);
+      analytics_total_halite * (total_me + 1) / (total_ships_count + 1);
 
   return next_halite_prediction - current_halite_prediction >
              genes->margin_to_create_new_ship &&
@@ -629,8 +633,8 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
       }
     }else if (!game_map->can_move(ship)) {
       navigate(ship, Direction::STILL, direction_queue);
-    }else if(game_map->get_safe_moves_around(ship, !!isRecallTime(ship)).size() == 0) {
-        navigate(ship, Direction::STILL, direction_queue);
+    }else if(game_map->get_safe_from_enemy_moves_around(ship).size() == 0) {
+      navigate(ship, Direction::STILL, direction_queue);
     }else {
       game.game_map->at(ship->position)->mark_safe();
       ships.push_back(ship);

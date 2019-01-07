@@ -88,6 +88,14 @@ namespace hlt {
 
           return mn;
         }
+        bool is_safe_dont_consider_me(Position& pos, int halite=0){
+          if(!at(pos)->is_occupied() || at(pos)->ship->owner == me ||(at(pos)->ship->owner != me && has_my_structure(pos))){
+            if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){
+              return true;
+            }
+          }
+          return false;
+        }
         bool is_safe(Position& pos, int halite=0, bool recall=false){
           if(!at(pos)->is_occupied() || (at(pos)->ship->owner != me && has_my_structure(pos)) || (recall &&  has_my_structure(pos))){
             if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){
@@ -121,12 +129,12 @@ namespace hlt {
           return safe_directions;
         }
 
-        std::vector<Direction> get_safe_moves_around(shared_ptr<Ship> ship, bool recall=false) {
+        std::vector<Direction> get_safe_from_enemy_moves_around(shared_ptr<Ship> ship) {
           std::vector<Direction> safe_directions;
 
           for(auto direction : ALL_CARDINALS){
             ship->position.directional_offset(_safe_moves_position, direction);
-            if(is_safe(_safe_moves_position, ship->halite, recall)){
+            if(is_safe_dont_consider_me(_safe_moves_position, ship->halite)){
               safe_directions.push_back(direction);
             }
           }
@@ -134,7 +142,7 @@ namespace hlt {
           if(safe_directions.size() == 0 && !is_safe(ship->position)){
             for(auto direction : ALL_CARDINALS){
               ship->position.directional_offset(_safe_moves_position, direction);
-              if(is_safe(_safe_moves_position, ship->halite, recall)){
+              if(is_safe_dont_consider_me(_safe_moves_position, ship->halite)){
                 safe_directions.push_back(direction);
               }
             }
