@@ -563,6 +563,11 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   }
 
   for(auto &position : faking_dropoffs){
+    if(game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id){
+      faking_dropoff[position.x][position.y] = false;
+      position = find_dropoff_place();
+      faking_dropoff[position.x][position.y] = true;
+    }
     game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
     game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
     game.game_map->at(position)->structure = game.me->dropoffs.back();
