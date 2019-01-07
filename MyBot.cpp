@@ -442,7 +442,7 @@ Position find_dropoff_place(){
   Position pos;
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
     for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
-      if(game.game_map->at(pos)->has_structure()){
+      if(game.game_map->at(pos)->has_structure() || faking_dropoff[pos.x][pos.y]){
         continue;
       }
       const int effect_distance = constants::WIDTH / game.players.size() / 4;
