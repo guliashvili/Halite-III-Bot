@@ -588,7 +588,7 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   updatePositionsOfOpponentsStuff();
 
   if(isTimeToDropoff()){
-    savings += 4000;
+    savings += constants::DROPOFF_COST;
     Position pos = find_dropoff_place();
     faking_dropoff[pos.x][pos.y] = true;
     faking_dropoffs.push_back(pos);
@@ -619,9 +619,9 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
       NUM_OF_MOVES_FROM_HOME[ship->id] = 0;  // at home (shipyard)
     }
     if (game_map->has_my_structure(ship->position) && faking_dropoff[ship->position.x][ship->position.y]){
-      if(me->halite >= 4000){
-        me->halite -= 4000;
-        savings -= 4000;
+      if(me->halite >= constants::DROPOFF_COST){
+        me->halite -= constants::DROPOFF_COST;
+        savings -= constants::DROPOFF_COST;
         faking_dropoff[ship->position.x][ship->position.y] = false;
         faking_dropoffs.erase(std::remove(faking_dropoffs.begin(), faking_dropoffs.end(), ship->position), faking_dropoffs.end());
         constructions.push_back(ship->make_dropoff());
