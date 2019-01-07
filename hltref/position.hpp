@@ -46,7 +46,7 @@ namespace hlt {
                 case Direction::STILL:
                     return Position{x,y};
                 default:
-                    log::log(std::string("Error: directional_offset1: unknown direction ") + static_cast<char>(d));
+                    log::log(std::string("Error: directional_offset: unknown direction ") + static_cast<char>(d));
                     exit(1);
             }
         }
@@ -68,7 +68,7 @@ namespace hlt {
                 case Direction::STILL:
                     break;
                 default:
-                    log::log(std::string("Error: directional_offset2: unknown direction ") + static_cast<char>(d));
+                    log::log(std::string("Error: directional_offset: unknown direction ") + static_cast<char>(d));
                     exit(1);
             }
         }
@@ -95,7 +95,7 @@ namespace hlt {
                     position.x = x;
                     break;
                 default:
-                    log::log(std::string("Error: directional_offset3: unknown direction ") + static_cast<char>(d));
+                    log::log(std::string("Error: directional_offset: unknown direction ") + static_cast<char>(d));
                     exit(1);
             }
         }

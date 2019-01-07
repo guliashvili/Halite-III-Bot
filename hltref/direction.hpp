@@ -32,7 +32,7 @@ namespace hlt {
             case Direction::STILL:
                 return Direction::STILL;
             default:
-                log::log(std::string("Error: invert_direction0: unknown direction ") + static_cast<char>(direction));
+                log::log(std::string("Error: invert_direction: unknown direction ") + static_cast<char>(direction));
                 exit(1);
         }
     }

@@ -21,9 +21,6 @@ hlt::Genes::Genes(int argc,  const char* argv[]){
       average_time_home_decay = 1.0/3;
       ship_spawn_step_margin = 60;
       collision_caution_margin = 200;
-      average_efficiency_per_decay = 1.0/3;
-      average_halite_per_trip_decay = 1.0/3;
-      dropoff_effect_decay_base = 1.01;
     }else{
       seed = Genes::get_arg(0, 10000000, argv[1]);
       extra_time_for_recall = Genes::get_arg(0, 10, argv[2]);
@@ -33,9 +30,6 @@ hlt::Genes::Genes(int argc,  const char* argv[]){
       average_time_home_decay = Genes::get_arg(double(0), double(1), argv[6]);
       ship_spawn_step_margin = Genes::get_arg(0, 200, argv[7]);
       collision_caution_margin = Genes::get_arg(0, 1000, argv[8]);
-      average_efficiency_per_decay = Genes::get_arg(double(0), double(1), argv[9]);
-      average_halite_per_trip_decay = Genes::get_arg(double(0), double(1), argv[10]);
-      dropoff_effect_decay_base = Genes::get_arg(double(1), double(1.2), argv[11]);
     }
 
 
