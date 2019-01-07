@@ -88,6 +88,14 @@ namespace hlt {
 
           return mn;
         }
+        bool is_safe(Position& pos, int halite=0, bool recall=false){
+          if(!at(pos)->is_occupied() || (at(pos)->ship->owner != me && has_my_structure(pos)) || (recall &&  has_my_structure(pos))){
+            if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){
+              return true;
+            }
+          }
+          return false;
+        }
 
         Position _safe_moves_position;
         std::vector<Direction> get_safe_moves(shared_ptr<Ship> ship, const Position& destination, bool recall=false) {
@@ -96,12 +104,42 @@ namespace hlt {
 
           for(auto direction : directions){
             ship->position.directional_offset(_safe_moves_position, direction);
-            if(!at(_safe_moves_position)->is_occupied() || (at(_safe_moves_position)->ship->owner != me && has_my_structure(_safe_moves_position)) || (recall &&  has_my_structure(_safe_moves_position))){
-              if(ship->halite - _get_min_halite_enemy(_safe_moves_position) < genes->collision_caution_margin){
+            if(is_safe(_safe_moves_position, ship->halite, recall)){
+                safe_directions.push_back(direction);
+            }
+          }
+
+          if(safe_directions.size() == 0 && !is_safe(ship->position)){
+            for(auto direction : directions){
+              ship->position.directional_offset(_safe_moves_position, direction);
+              if(is_safe(_safe_moves_position, 0, recall)){
+                  safe_directions.push_back(direction);
+              }
+            }
+          }
+
+          return safe_directions;
+        }
+
+        std::vector<Direction> get_safe_moves_around(shared_ptr<Ship> ship, bool recall=false) {
+          std::vector<Direction> safe_directions;
+
+          for(auto direction : ALL_CARDINALS){
+            ship->position.directional_offset(_safe_moves_position, direction);
+            if(is_safe(_safe_moves_position, ship->halite, recall)){
+              safe_directions.push_back(direction);
+            }
+          }
+
+          if(safe_directions.size() == 0 && !is_safe(ship->position)){
+            for(auto direction : ALL_CARDINALS){
+              ship->position.directional_offset(_safe_moves_position, direction);
+              if(is_safe(_safe_moves_position, ship->halite, recall)){
                 safe_directions.push_back(direction);
               }
             }
           }
+
           return safe_directions;
         }
 

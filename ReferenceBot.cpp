@@ -549,15 +549,13 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(
     for (auto &ship : going_home) {
       ships_no_still.push_back(ship);
     }
-  }
 
-  was_blocker =
-      was_blocker ||
+  }
+  was_blocker = was_blocker ||
       std::find_if(direction_queue_temporary.begin(),
                    direction_queue_temporary.end(), [](const auto &element) {
-                     return get<1>(element) == Direction::STILL;
+                     return get<1>(element) == Direction::STILL && game.game_map->at(get<0>(element)->position)->collision;;
                    }) != direction_queue_temporary.end();
-
   if (was_blocker) {
     ships_no_still.reserve(ships.size());
     for (auto &[ship, direction] : direction_queue_temporary) {
@@ -643,7 +641,9 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
       }
     }else if (!game_map->can_move(ship)) {
       navigate(ship, Direction::STILL, direction_queue);
-    } else {
+    }else if(game_map->get_safe_moves_around(ship, !!isRecallTime(ship)).size() == 0) {
+        navigate(ship, Direction::STILL, direction_queue);
+    }else {
       game.game_map->at(ship->position)->mark_safe();
       ships.push_back(ship);
     }
