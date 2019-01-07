@@ -257,8 +257,7 @@ Direction goToPointEfficient(shared_ptr<Ship> ship, Position destination) {
     return Direction::STILL;
   } else {
     const int num_of_turns_from_home = NUM_OF_MOVES_FROM_HOME[ship->id];
-    pair<double, Direction> best;
-    best.first = -1;
+    pair<double, Direction> best = {-1, Direction::STILL};
     for (auto &[steps, direction, halite] : dp_results) {
       double cur_efficiency = double(halite) / (num_of_turns_from_home + steps);
       if (cur_efficiency > get<0>(best)) {

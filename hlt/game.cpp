@@ -12,7 +12,7 @@ hlt::Game::Game() : turn_number(0) {
     std::stringstream input(get_string());
     input >> num_players >> my_id;
 
-    // log::open(my_id);
+    log::open(my_id);
 
     for (int i = 0; i < num_players; ++i) {
         players.push_back(Player::_generate());
