@@ -7,6 +7,7 @@ void hlt::GameMap::_update() {
         for (int x = 0; x < width; ++x) {
             cells[y][x].ship.reset();
             cells[y][x].structure.reset();
+            cells[y][x].collision = false;
         }
     }
 

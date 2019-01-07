@@ -11,10 +11,11 @@ namespace hlt {
         Halite halite;
         std::shared_ptr<Ship> ship;
         std::shared_ptr<Entity> structure; // only has dropoffs and shipyards; if id is -1, then it's a shipyard, otherwise it's a dropoff
+        bool collision;
 
         MapCell(int x, int y, Halite halite) :
             position(x, y),
-            halite(halite)
+            halite(halite), collision(false)
         {}
 
         bool is_empty() const {
@@ -30,6 +31,7 @@ namespace hlt {
         }
 
         void mark_unsafe(const std::shared_ptr<Ship>& ship) {
+            collision |= this->ship != nullptr && this->ship != ship;
             this->ship = ship;
         }
 
@@ -42,6 +44,7 @@ namespace hlt {
         }
         void mark_safe(){
           ship = nullptr;
+          collision = false;
         }
     };
 }

@@ -41,6 +41,7 @@ void hlt::Game::update_frame() {
 
     game_map->_update();
 
+
     for (const auto& player : players) {
         for (auto ship : player->ships) {
             game_map->at(ship)->mark_unsafe(ship);
