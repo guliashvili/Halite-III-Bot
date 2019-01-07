@@ -12,6 +12,7 @@
 #include <ratio>
 #include <tuple>
 #include <unordered_map>
+#include <cmath>
 
 using namespace std;
 using namespace hlt;
@@ -21,6 +22,45 @@ shared_ptr<Genes> genes;
 Game game;
 shared_ptr<Player> me;
 high_resolution_clock::time_point t1;
+
+// Opponent analytics
+vector<Position> opponents_ships;
+vector<Position> opponents_dropoffs;
+
+void updatePositionsOfOpponentsStuff() {
+  opponents_ships.clear();
+  opponents_dropoffs.clear();
+  for (auto player : game.players) {
+    if(player->id == game.me->id){
+      continue;
+    }
+
+    for (auto dropoff : player->all_dropoffs) {
+      opponents_dropoffs.push_back(dropoff->position);
+    }
+    for (auto ship : player->ships) {
+      opponents_ships.push_back(ship->position);
+    }
+  }
+}
+
+// [1.0, 2 ^ (PLAYERS-1)] - impact of opponents dropoffs on the area
+double getDropoffImpact(Position pos, Position dropoff){
+  const int num_of_players = game.players.size();
+  int distance = game.game_map->calculate_distance(pos, dropoff);
+  return 2 - pow(genes->dropoff_effect_decay_base, distance);
+}
+
+double impactOfOpponentsDropoffs(Position pos) {
+  double impact = 1.0;
+  for (auto dropoff : opponents_dropoffs) {
+    impact *= getDropoffImpact(pos, dropoff);
+  }
+  return impact;
+}
+
+// end opponent analytics
+
 
 int get_milisecond_left() {
   return 2000 - duration_cast<std::chrono::milliseconds>(
@@ -397,7 +437,7 @@ bool isTimeToDropoff(){
 
 Position find_dropoff_place(){
 
-  pair<int, Position> best_dropoff;
+  pair<double, Position> best_dropoff;
   best_dropoff.first = -1;
   Position pos;
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
@@ -407,13 +447,15 @@ Position find_dropoff_place(){
       }
       const int effect_distance = constants::WIDTH / game.players.size() / 4;
 
-      int total_halite_in_range = 0;
+      double total_halite_in_range = 0;
       for(int delta_x = -effect_distance; delta_x < effect_distance; delta_x++){
         for(int delta_y = -(effect_distance-abs(delta_x)); delta_y < (effect_distance-abs(delta_x)); delta_y++){
           Position cur_cell( (((x+delta_x)%constants::WIDTH)+constants::WIDTH)%constants::WIDTH,  (((y+delta_y)%constants::HEIGHT)+constants::HEIGHT)%constants::HEIGHT);
           total_halite_in_range += game.game_map->at(cur_cell)->halite;
         }
       }
+
+      total_halite_in_range /= impactOfOpponentsDropoffs(pos);
 
       if(total_halite_in_range > get<0>(best_dropoff)){
         best_dropoff = {total_halite_in_range, pos};
@@ -543,6 +585,8 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   unique_ptr<GameMap> &game_map = game.game_map;
   game_map->init(me->id, genes);
 
+  updatePositionsOfOpponentsStuff();
+
   if(isTimeToDropoff()){
     savings += 4000;
     Position pos = find_dropoff_place();
@@ -623,7 +667,7 @@ int main(int argc, const char *argv[]) {
   // This is a good place to do computationally expensive start-up
   // pre-processing. As soon as you call "ready" function below, the 2 second
   // per turn timer will start.
-  game.ready("MyCppBot");
+  game.ready(__FILE__);
   genes = make_shared<Genes>(argc, argv);
   srand(genes->seed);
   // log::log("Successfully created bot! My Player ID is " +
