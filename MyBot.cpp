@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstring>
 #include <ctime>
 #include <optional>
 #include <random>
@@ -25,14 +26,60 @@ shared_ptr<Player> me;
 high_resolution_clock::time_point t1;
 
 // Opponent analytics
-vector<Position> opponents_ships;
+vector<Position> our_dropoffs;
+vector<Position> our_ships;
 vector<Position> opponents_dropoffs;
+vector<Position> opponents_ships;
+int distance_from_our_dropoffs[64][64];
+int distance_from_our_ships[64][64];
+int distance_from_their_dropoffs[64][64];
+int distance_from_their_ships[64][64];
+int probability_of_invasion[64][64];
 
 shared_ptr<Ship> analytics_ship_last_state[1000];
 shared_ptr<Ship> analytics_ship_cur_state[1000];
 vector<Direction> analytics_ship_directions[1000];
 vector<Direction> analytics_ship_will_go_to[1000];
 int analytics_total_halite = 0;
+
+int adjust(int value, int max) {
+  return (value + max) % max;
+}
+
+void bfs(int (&d)[64][64], vector<Position> &q) {
+  memset(d, -1, sizeof d);
+  for(int i=0; i<q.size(); i++){
+    d[q[i].x][q[i].y] = 0;
+  }
+  int xx[] = { -1, 0, 1, 0 };
+  int yy[] = { 0, 1, 0, -1 };
+  for(int i=0; i<q.size(); i++){
+    for (int j=0; j<4; j++) {
+      int x = adjust(q[i].x + xx[j], constants::WIDTH);
+      int y = adjust(q[i].y + yy[j], constants::HEIGHT);
+
+      if (d[x][y] == -1) {
+        d[x][y] = d[q[i].x][q[i].y] + 1;
+        q.push_back(Position(x, y));
+      }
+    }
+  }
+}
+
+void computeProbabilityOfInvasion() {
+  bfs(distance_from_our_dropoffs, our_dropoffs);
+  bfs(distance_from_our_ships, our_ships);
+  bfs(distance_from_their_dropoffs, opponents_dropoffs);
+  bfs(distance_from_their_ships, opponents_ships);
+
+  memset(probability_of_invasion, 0, sizeof probability_of_invasion);
+  for (int y = 0; y < constants::HEIGHT; y++) {
+    for (int x = 0; x < constants::WIDTH; x++) {
+      int v = distance_from_our_ships[x][y] - distance_from_their_ships[x][y];
+      probability_of_invasion[x][y] = (int)(100.0 * (v + constants::HEIGHT) / 2 / constants::HEIGHT);
+    }
+  }
+}
 
 void updatePositionsOfOpponentsStuff() {
   analytics_total_halite = 0;
@@ -46,17 +93,23 @@ void updatePositionsOfOpponentsStuff() {
     }
   }
 
-  opponents_ships.clear();
+  our_dropoffs.clear();
+  our_ships.clear();
   opponents_dropoffs.clear();
+  opponents_ships.clear();
   for (auto player : game.players) {
     for (auto dropoff : player->all_dropoffs) {
       if(player->id != game.me->id){
         opponents_dropoffs.push_back(dropoff->position);
+      } else {
+        our_dropoffs.push_back(dropoff->position);
       }
     }
     for (auto ship : player->ships) {
       if(player->id != game.me->id){
         opponents_ships.push_back(ship->position);
+      } else {
+        our_ships.push_back(ship->position);
       }
 
       analytics_ship_last_state[ship->id] = analytics_ship_cur_state[ship->id];
@@ -94,6 +147,8 @@ void updatePositionsOfOpponentsStuff() {
       }
     }
   }
+
+  computeProbabilityOfInvasion();
 }
 
 // [1.0, 2 ^ (PLAYERS-1)] - impact of opponents dropoffs on the area
@@ -111,8 +166,19 @@ double impactOfOpponentsDropoffs(Position pos) {
   return impact;
 }
 
-// end opponent analytics
+int distance_from_our_other_dropoffs(Position ref_dropoff, Position pos) {
+  int result = constants::HEIGHT + constants::WIDTH;
+  for (auto dropoff : game.me->all_dropoffs) {
+    if (dropoff->position == ref_dropoff) {
+      continue;
+    } else if (result > game.game_map->calculate_distance(pos, dropoff->position)) {
+      result = game.game_map->calculate_distance(pos, dropoff->position);
+    }
+  }
+  return result;
+}
 
+// end opponent analytics
 
 int get_milisecond_left() {
   return 2000 - duration_cast<std::chrono::milliseconds>(
@@ -470,7 +536,105 @@ bool should_ship_new_ship() {
 }
 
 
-// int map_halite_clone[64][64];
+// Dropoff
+vector<double> dropOff_potential[64][64];
+void updateDropoffCandidates() {
+  Position pos;
+  for(int &x = pos.x = 0; x < constants::WIDTH; x++){
+    for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
+      const int effect_distance = constants::WIDTH / game.players.size() / 2;
+
+    vector<double> halite_quality;
+      for(int delta_x = -effect_distance; delta_x < effect_distance; delta_x++){
+        for(int delta_y = -(effect_distance-abs(delta_x)); delta_y < (effect_distance-abs(delta_x)); delta_y++){
+          Position cur_cell(adjust(x+delta_x, constants::WIDTH), adjust(y+delta_y, constants::HEIGHT));
+
+      int h = game.game_map->at(cur_cell)->halite;
+
+      double optimistic_score = (double) h / 2 / (delta_x + delta_y + 1);
+      optimistic_score -= (double) h / 2 / (distance_from_our_other_dropoffs(pos, cur_cell) + 1);
+      double realistic_score = (double) optimistic_score * (100 - probability_of_invasion[cur_cell.x][cur_cell.y]);
+      halite_quality.push_back(realistic_score);
+        }
+      }
+    sort(halite_quality.begin(), halite_quality.end(), [](auto l, auto r) { return l < r; });
+
+    dropOff_potential[x][y] = halite_quality;
+    }
+  }
+}
+
+bool dropoff_under_construction = false;
+pair<double, Position> shallWeInvestInDropOff() {
+  if (dropoff_under_construction) {
+    return {false, Position(0,0)};
+  }
+  int ships = game.me->ships.size();
+
+  vector<double> existing_potential;
+  for (auto d : game.me->all_dropoffs) {
+    existing_potential.insert(
+      existing_potential.end(),
+      dropOff_potential[d->position.x][d->position.y].begin(),
+      dropOff_potential[d->position.x][d->position.y].end()
+    );
+  }
+  sort(existing_potential.begin(), existing_potential.end(), [](auto l, auto r) { return l < r; });
+
+  double combined_profit[10000];
+  for(int i=0; i<10000; i++){
+    combined_profit[i] = (i == 0) ? 0 : combined_profit[i-1];
+    if (i < existing_potential.size()) {
+      combined_profit[i] += existing_potential[i];
+    }
+  }
+
+  pair<double, Position> best_dropoff;
+
+  Position pos;
+  for(int &x = pos.x = 0; x < constants::WIDTH; x++){
+    for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
+      if(game.game_map->at(pos)->has_structure() || faking_dropoff[pos.x][pos.y]){
+        continue;
+      }
+      int d = distance_from_our_ships[pos.x][pos.y];
+      double initial_cost = -constants::DROPOFF_COST
+        -constants::SHIP_COST
+        - (combined_profit[d * ships] - combined_profit[d * (ships - 1)]);
+
+      // amount of harite mined at new dropoff vs all other combined (if no dropoff would be built)
+      int ships_assigned_to_new_dropoff = (int) (ships + game.me->all_dropoffs.size()) / (game.me->all_dropoffs.size() + 1);
+      int ships_left = ships - ships_assigned_to_new_dropoff;
+      int start_point = d * (ships - 1);
+      int target_round = constants::HEIGHT / game.players.size() / 4;
+      double profit = initial_cost - (combined_profit[start_point + (target_round - d - 1) * ships_left] - combined_profit[start_point]);
+      for (int round = d + 1, i=0; round < target_round && i < dropOff_potential[x][y].size(); round++) {
+        for(int j=0; j<ships_assigned_to_new_dropoff && i < dropOff_potential[x][y].size(); j++, i++) {
+          profit += dropOff_potential[x][y][i];
+        }
+      }
+        if(profit > get<0>(best_dropoff)){
+        best_dropoff = {profit, pos};
+        }
+    }
+  }
+
+  if(get<0>(best_dropoff) > 0.0){
+      return {true, get<1>(best_dropoff)};
+  }
+}
+
+/*
+double efficiency = halite_at_location / distance / 2
+
+dropoff_candidates[64][64] = vec [ (location, efficiency)  ];
+
+penalty = - cost_of_dropoff - cost_of_ship - distance_to_location + halite_at_location
+
+ship_to_dropoff = // some biparite matching
+*/
+
+
 
 vector<Position> faking_dropoffs;
 bool isTimeToDropoff(){
@@ -502,20 +666,12 @@ Position find_dropoff_place(){
       if(total_halite_in_range > get<0>(best_dropoff)){
         best_dropoff = {total_halite_in_range, pos};
       }
-
-      // map_halite_clone[x][y] = game.game_map->at(pos)->halite;
     }
   }
 
   return get<1>(best_dropoff);
-
-  // for(auto player : game.players){
-  //   for(auto dropoff : player->all_dropoffs){
-  //     for(int delta_x = -)
-  //     min_dst = min(min_dst, game.game_map->calculate_distance(candidate_pos, dropoff->position))
-  //   }
-  // }
 }
+// Dropoff - End
 
 // boolean flag telling is ship currently going home (to shipyard)
 bool GO_HOME_EFFICIENT[1000] = {false};
@@ -626,18 +782,23 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   game_map->init(me->id, genes, analytics_ship_will_go_to);
 
   updatePositionsOfOpponentsStuff();
+  updateDropoffCandidates();
 
-  if(isTimeToDropoff()){
+  auto dropoff_assessment = shallWeInvestInDropOff();
+
+  if(get<0>(dropoff_assessment)) {
     savings += constants::DROPOFF_COST;
-    Position pos = find_dropoff_place();
+    Position pos = get<1>(dropoff_assessment);
     faking_dropoff[pos.x][pos.y] = true;
     faking_dropoffs.push_back(pos);
   }
 
   for(auto &position : faking_dropoffs){
-    if(me->halite < 3000 || (game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id)){
+    if(game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id){
       faking_dropoff[position.x][position.y] = false;
-      position = find_dropoff_place();
+      auto dropoff_assessment = shallWeInvestInDropOff();
+      position = get<1>(dropoff_assessment);
+      // @TODO - don't get quite this logic ...
       faking_dropoff[position.x][position.y] = true;
     }
     game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
