@@ -15,10 +15,12 @@ namespace hlt {
         std::vector<std::vector<MapCell>> cells;
         PlayerId me = -1;
         shared_ptr<Genes> genes;
+        vector<Direction> *ship_will_go_to;
 
-        void init(PlayerId me_, shared_ptr<Genes> genes_){
+        void init(PlayerId me_, shared_ptr<Genes> genes_, vector<Direction> ship_will_go_to_[1000]){
           me = me_;
           genes = genes_;
+          ship_will_go_to = ship_will_go_to_;
         }
 
         MapCell* at(const Position& position) {
@@ -82,7 +84,11 @@ namespace hlt {
           for(auto direction : ALL_CARDINALS){
             position.directional_offset(_min_halite_next_pos, direction);
             if(at(_min_halite_next_pos)->is_occupied() && at(_min_halite_next_pos)->ship->owner != me){
+                // int ship_id = at(_min_halite_next_pos)->ship->id;
+                // const auto& ship_movements = ship_will_go_to[ship_id];
+                // if(find(ship_movements.begin(), ship_movements.end(), invert_direction(direction)) != ship_movements.end()){
                 mn = min(mn, at(_min_halite_next_pos)->ship->halite);
+                // }
             }
           }
 
@@ -97,6 +103,7 @@ namespace hlt {
           }
           return true;
         }
+
         bool is_safe(Position& pos, int halite=0, bool recall=false){
           if(recall &&  has_my_structure(pos)){ // When recall always enter in the base. Even if you crash friends
             return true;

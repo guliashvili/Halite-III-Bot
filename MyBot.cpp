@@ -31,7 +31,7 @@ vector<Position> opponents_dropoffs;
 shared_ptr<Ship> analytics_ship_last_state[1000];
 shared_ptr<Ship> analytics_ship_cur_state[1000];
 vector<Direction> analytics_ship_directions[1000];
-vector<Direction> analytics_ship_will_not_go_to[1000];
+vector<Direction> analytics_ship_will_go_to[1000];
 int analytics_total_halite = 0;
 
 void updatePositionsOfOpponentsStuff() {
@@ -70,14 +70,26 @@ void updatePositionsOfOpponentsStuff() {
         }
       }
 
-      analytics_ship_will_not_go_to[ship->id] = {};
+      analytics_ship_will_go_to[ship->id] = {Direction::NORTH, Direction::SOUTH, Direction::WEST, Direction::EAST, Direction::STILL};
+
       if(analytics_ship_directions[ship->id].size() > 5){
         analytics_ship_directions[ship->id] = vector<Direction>(analytics_ship_directions[ship->id].end() - 5, analytics_ship_directions[ship->id].end());
         set<Direction> directions_used(analytics_ship_directions[ship->id].begin(), analytics_ship_directions[ship->id].end());
         if(directions_used.count(Direction::STILL) == 0 && directions_used.size() <= 2){
+
+          vector<Direction> will_not_go_to;
+          analytics_ship_will_go_to[ship->id] = {Direction::STILL}; //TODO will it really STILL?
+
           for(Direction direction_used : directions_used){
-            analytics_ship_will_not_go_to[ship->id].push_back(invert_direction(direction_used));
+            will_not_go_to.push_back(invert_direction(direction_used));
           }
+          for(auto direction : ALL_CARDINALS){
+            if(find(will_not_go_to.begin(), will_not_go_to.end(), direction) == will_not_go_to.end()){
+              analytics_ship_will_go_to[ship->id].push_back(direction);
+            }
+          }
+
+
         }
       }
     }
@@ -611,7 +623,7 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   vector<Command> constructions;
   me = game.me;
   unique_ptr<GameMap> &game_map = game.game_map;
-  game_map->init(me->id, genes);
+  game_map->init(me->id, genes, analytics_ship_will_go_to);
 
   updatePositionsOfOpponentsStuff();
 
