@@ -13,6 +13,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <cmath>
+#include <set>
 
 using namespace std;
 using namespace hlt;
@@ -30,6 +31,7 @@ vector<Position> opponents_dropoffs;
 shared_ptr<Ship> analytics_ship_last_state[1000];
 shared_ptr<Ship> analytics_ship_cur_state[1000];
 vector<Direction> analytics_ship_directions[1000];
+vector<Direction> analytics_ship_will_not_go_to[1000];
 int analytics_total_halite = 0;
 
 void updatePositionsOfOpponentsStuff() {
@@ -64,6 +66,17 @@ void updatePositionsOfOpponentsStuff() {
           if(ship->position == analytics_ship_last_state[ship->id]->position.directional_offset(direction)){
             analytics_ship_directions[ship->id].push_back(direction);
             break;
+          }
+        }
+      }
+
+      analytics_ship_will_not_go_to[ship->id] = {};
+      if(analytics_ship_directions[ship->id].size() > 5){
+        analytics_ship_directions[ship->id] = vector<Direction>(analytics_ship_directions[ship->id].end() - 5, analytics_ship_directions[ship->id].end());
+        set<Direction> directions_used(analytics_ship_directions[ship->id].begin(), analytics_ship_directions[ship->id].end());
+        if(directions_used.count(Direction::STILL) == 0 && directions_used.size() <= 2){
+          for(Direction direction_used : directions_used){
+            analytics_ship_will_not_go_to[ship->id].push_back(invert_direction(direction_used));
           }
         }
       }
