@@ -545,6 +545,7 @@ void updateDropoffCandidates() {
       const int effect_distance = constants::WIDTH / game.players.size() / 2;
 
       vector<double> &halite_quality = dropOff_potential[x][y];
+      halite_quality.clear();
       for(int delta_x = -effect_distance; delta_x < effect_distance; delta_x++){
         for(int delta_y = -(effect_distance-abs(delta_x)); delta_y < (effect_distance-abs(delta_x)); delta_y++){
           Position cur_cell(adjust(x+delta_x, constants::WIDTH), adjust(y+delta_y, constants::HEIGHT));
@@ -605,7 +606,8 @@ pair<double, Position> shallWeInvestInDropOff() {
       int ships_left = ships - ships_assigned_to_new_dropoff;
       int start_point = d * (ships - 1);
       int target_round = constants::HEIGHT / game.players.size() / 4;
-      double profit = initial_cost - (combined_profit[start_point + (target_round - d - 1) * ships_left] - combined_profit[start_point]);
+      double profit = initial_cost -
+        (combined_profit[target_round * ships] - combined_profit[start_point + (target_round - d - 1) * ships_left]);
       for (int round = d + 1, i=0; round < target_round && i < dropOff_potential[x][y].size(); round++) {
         for(int j=0; j<ships_assigned_to_new_dropoff && i < dropOff_potential[x][y].size(); j++, i++) {
           profit += dropOff_potential[x][y][i];
