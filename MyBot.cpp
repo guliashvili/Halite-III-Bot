@@ -27,7 +27,8 @@ high_resolution_clock::time_point t1;
 vector<Position> opponents_ships;
 vector<Position> opponents_dropoffs;
 
-unique_ptr<Position> analytics_ship_last_pos[1000];
+shared_ptr<Ship> analytics_ship_last_state[1000];
+shared_ptr<Ship> analytics_ship_cur_state[1000];
 vector<Direction> analytics_ship_directions[1000];
 int analytics_total_halite = 0;
 
@@ -46,15 +47,26 @@ void updatePositionsOfOpponentsStuff() {
   opponents_ships.clear();
   opponents_dropoffs.clear();
   for (auto player : game.players) {
-    if(player->id == game.me->id){
-      continue;
-    }
-
     for (auto dropoff : player->all_dropoffs) {
-      opponents_dropoffs.push_back(dropoff->position);
+      if(player->id != game.me->id){
+        opponents_dropoffs.push_back(dropoff->position);
+      }
     }
     for (auto ship : player->ships) {
-      opponents_ships.push_back(ship->position);
+      if(player->id != game.me->id){
+        opponents_ships.push_back(ship->position);
+      }
+
+      analytics_ship_last_state[ship->id] = analytics_ship_cur_state[ship->id];
+      analytics_ship_cur_state[ship->id] = ship;
+      if(analytics_ship_last_state[ship->id] != nullptr){
+        for(auto direction : ALL_CARDINALS){
+          if(ship->position == analytics_ship_last_state[ship->id]->position.directional_offset(direction)){
+            analytics_ship_directions[ship->id].push_back(direction);
+            break;
+          }
+        }
+      }
     }
   }
 }

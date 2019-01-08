@@ -88,20 +88,30 @@ namespace hlt {
 
           return mn;
         }
-        bool is_safe_dont_consider_me(Position& pos, int halite=0){
-          if(!at(pos)->is_occupied() || at(pos)->ship->owner == me ||(at(pos)->ship->owner != me && has_my_structure(pos))){
-            if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){
-              return true;
-            }
+        bool is_safe_dont_consider_me(Position& pos){
+          if(has_my_structure(pos)){ // Always crash enemy in the base
+            return true;
           }
-          return false;
+          if(at(pos)->is_occupied() && at(pos)->ship->owner != me){ // In general if occupied don't crash. #TODO we need to reconsider. We can have enemy movement analytics
+            return false;
+          }
+          return true;
         }
         bool is_safe(Position& pos, int halite=0, bool recall=false){
-          if(!at(pos)->is_occupied() || (at(pos)->ship->owner != me && has_my_structure(pos)) || (recall &&  has_my_structure(pos))){
-            if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){
-              return true;
-            }
+          if(recall &&  has_my_structure(pos)){ // When recall always enter in the base. Even if you crash friends
+            return true;
           }
+          if((!at(pos)->is_occupied() || at(pos)->ship->owner != me) && has_my_structure(pos)){ // Always crash enemy in the base
+            return true;
+          }
+          if(at(pos)->is_occupied()){ // In general if occupied don't crash. #TODO we need to reconsider. We can have enemy movement analytics
+            return false;
+          }
+
+          if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){ // If it's not vulnerable place it's fine. If way lighter enemy ship will be there in one step, not safe. #TODO need to reconsider. Depends on the player aggressivnes and ship displacement
+              return true;
+          }
+
           return false;
         }
 
@@ -134,17 +144,8 @@ namespace hlt {
 
           for(auto direction : ALL_CARDINALS){
             ship->position.directional_offset(_safe_moves_position, direction);
-            if(is_safe_dont_consider_me(_safe_moves_position, ship->halite)){
+            if(is_safe_dont_consider_me(_safe_moves_position)){
               safe_directions.push_back(direction);
-            }
-          }
-
-          if(safe_directions.size() == 0 && !is_safe(ship->position)){
-            for(auto direction : ALL_CARDINALS){
-              ship->position.directional_offset(_safe_moves_position, direction);
-              if(is_safe_dont_consider_me(_safe_moves_position, ship->halite)){
-                safe_directions.push_back(direction);
-              }
             }
           }
 
