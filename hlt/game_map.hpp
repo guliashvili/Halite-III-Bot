@@ -84,11 +84,11 @@ namespace hlt {
           for(auto direction : ALL_CARDINALS){
             position.directional_offset(_min_halite_next_pos, direction);
             if(at(_min_halite_next_pos)->is_occupied() && at(_min_halite_next_pos)->ship->owner != me){
-                // int ship_id = at(_min_halite_next_pos)->ship->id;
-                // const auto& ship_movements = ship_will_go_to[ship_id];
-                // if(find(ship_movements.begin(), ship_movements.end(), invert_direction(direction)) != ship_movements.end()){
-                mn = min(mn, at(_min_halite_next_pos)->ship->halite);
-                // }
+                int ship_id = at(_min_halite_next_pos)->ship->id;
+                const auto& ship_movements = ship_will_go_to[ship_id];
+                if(find(ship_movements.begin(), ship_movements.end(), invert_direction(direction)) != ship_movements.end()){
+                  mn = min(mn, at(_min_halite_next_pos)->ship->halite);
+                }
             }
           }
 

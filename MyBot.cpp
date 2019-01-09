@@ -70,27 +70,40 @@ void updatePositionsOfOpponentsStuff() {
         }
       }
 
-      analytics_ship_will_go_to[ship->id] = {Direction::NORTH, Direction::SOUTH, Direction::WEST, Direction::EAST, Direction::STILL};
+      if(ship->halite < game.game_map->at(ship->position)->move_cost()){
+        analytics_ship_will_go_to[ship->id] = {Direction::STILL};
+      }else{
+        analytics_ship_will_go_to[ship->id] = {Direction::NORTH, Direction::SOUTH, Direction::WEST, Direction::EAST, Direction::STILL};
 
-      if(analytics_ship_directions[ship->id].size() > 5){
-        analytics_ship_directions[ship->id] = vector<Direction>(analytics_ship_directions[ship->id].end() - 5, analytics_ship_directions[ship->id].end());
-        set<Direction> directions_used(analytics_ship_directions[ship->id].begin(), analytics_ship_directions[ship->id].end());
-        if(directions_used.count(Direction::STILL) == 0 && directions_used.size() <= 2){
-
-          vector<Direction> will_not_go_to;
-          analytics_ship_will_go_to[ship->id] = {Direction::STILL}; //TODO will it really STILL?
-
-          for(Direction direction_used : directions_used){
-            will_not_go_to.push_back(invert_direction(direction_used));
-          }
-          for(auto direction : ALL_CARDINALS){
-            if(find(will_not_go_to.begin(), will_not_go_to.end(), direction) == will_not_go_to.end()){
-              analytics_ship_will_go_to[ship->id].push_back(direction);
+        if(analytics_ship_directions[ship->id].size() > 5){
+          analytics_ship_directions[ship->id] = vector<Direction>(analytics_ship_directions[ship->id].end() - 5, analytics_ship_directions[ship->id].end());
+          set<Direction> directions_used;
+          for(auto direction : analytics_ship_directions[ship->id]){
+            if(direction == Direction::STILL || directions_used.count(invert_direction(direction))){
+              directions_used.clear();
+              break;
             }
+            directions_used.insert(direction);
           }
+          if(directions_used.size() != 0 && directions_used.size() <= 2){
+
+            vector<Direction> will_not_go_to;
+            analytics_ship_will_go_to[ship->id] = {Direction::STILL}; //TODO will it really STILL?
+
+            for(Direction direction_used : directions_used){
+              will_not_go_to.push_back(invert_direction(direction_used));
+            }
+            for(auto direction : ALL_CARDINALS){
+              if(find(will_not_go_to.begin(), will_not_go_to.end(), direction) == will_not_go_to.end()){
+                analytics_ship_will_go_to[ship->id].push_back(direction);
+              }
+            }
 
 
+          }
         }
+
+
       }
     }
   }
