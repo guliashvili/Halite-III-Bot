@@ -4,6 +4,7 @@
 #include "map_cell.hpp"
 #include "constants.hpp"
 #include "genes.hpp"
+#include "direction.hpp"
 
 #include <vector>
 using namespace std;
