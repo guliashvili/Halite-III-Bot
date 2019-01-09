@@ -4,8 +4,10 @@
 #include "map_cell.hpp"
 #include "constants.hpp"
 #include "genes.hpp"
+#include "direction.hpp"
 
 #include <vector>
+#include <algorithm>    // std::find
 using namespace std;
 
 namespace hlt {
@@ -15,10 +17,12 @@ namespace hlt {
         std::vector<std::vector<MapCell>> cells;
         PlayerId me = -1;
         shared_ptr<Genes> genes;
+        vector<Direction> *ship_will_go_to;
 
-        void init(PlayerId me_, shared_ptr<Genes> genes_){
+        void init(PlayerId me_, shared_ptr<Genes> genes_, vector<Direction> ship_will_go_to_[1000]){
           me = me_;
           genes = genes_;
+          ship_will_go_to = ship_will_go_to_;
         }
 
         MapCell* at(const Position& position) {
@@ -82,26 +86,41 @@ namespace hlt {
           for(auto direction : ALL_CARDINALS){
             position.directional_offset(_min_halite_next_pos, direction);
             if(at(_min_halite_next_pos)->is_occupied() && at(_min_halite_next_pos)->ship->owner != me){
-                mn = min(mn, at(_min_halite_next_pos)->ship->halite);
+                int ship_id = at(_min_halite_next_pos)->ship->id;
+                const auto& ship_movements = ship_will_go_to[ship_id];
+                if(find(ship_movements.begin(), ship_movements.end(), invert_direction(direction)) != ship_movements.end()){
+                  mn = min(mn, at(_min_halite_next_pos)->ship->halite);
+                }
             }
           }
 
           return mn;
         }
-        bool is_safe_dont_consider_me(Position& pos, int halite=0){
-          if(!at(pos)->is_occupied() || at(pos)->ship->owner == me ||(at(pos)->ship->owner != me && has_my_structure(pos))){
-            if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){
-              return true;
-            }
+        bool is_safe_dont_consider_me(Position& pos){
+          if(has_my_structure(pos)){ // Always crash enemy in the base
+            return true;
           }
-          return false;
+          if(at(pos)->is_occupied() && at(pos)->ship->owner != me){ // In general if occupied don't crash. #TODO we need to reconsider. We can have enemy movement analytics
+            return false;
+          }
+          return true;
         }
+
         bool is_safe(Position& pos, int halite=0, bool recall=false){
-          if(!at(pos)->is_occupied() || (at(pos)->ship->owner != me && has_my_structure(pos)) || (recall &&  has_my_structure(pos))){
-            if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){
-              return true;
-            }
+          if(recall &&  has_my_structure(pos)){ // When recall always enter in the base. Even if you crash friends
+            return true;
           }
+          if((!at(pos)->is_occupied() || at(pos)->ship->owner != me) && has_my_structure(pos)){ // Always crash enemy in the base
+            return true;
+          }
+          if(at(pos)->is_occupied()){ // In general if occupied don't crash. #TODO we need to reconsider. We can have enemy movement analytics
+            return false;
+          }
+
+          if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){ // If it's not vulnerable place it's fine. If way lighter enemy ship will be there in one step, not safe. #TODO need to reconsider. Depends on the player aggressivnes and ship displacement
+              return true;
+          }
+
           return false;
         }
 
@@ -134,17 +153,8 @@ namespace hlt {
 
           for(auto direction : ALL_CARDINALS){
             ship->position.directional_offset(_safe_moves_position, direction);
-            if(is_safe_dont_consider_me(_safe_moves_position, ship->halite)){
+            if(is_safe_dont_consider_me(_safe_moves_position)){
               safe_directions.push_back(direction);
-            }
-          }
-
-          if(safe_directions.size() == 0 && !is_safe(ship->position)){
-            for(auto direction : ALL_CARDINALS){
-              ship->position.directional_offset(_safe_moves_position, direction);
-              if(is_safe_dont_consider_me(_safe_moves_position, ship->halite)){
-                safe_directions.push_back(direction);
-              }
             }
           }
 
