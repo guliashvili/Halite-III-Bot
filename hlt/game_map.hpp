@@ -7,6 +7,7 @@
 #include "direction.hpp"
 
 #include <vector>
+#include <algorithm>    // std::find
 using namespace std;
 
 namespace hlt {
