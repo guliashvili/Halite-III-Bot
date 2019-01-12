@@ -539,6 +539,11 @@ bool should_ship_new_ship() {
 // Dropoff
 vector<double> dropOff_potential[64][64];
 void updateDropoffCandidates() {
+	int dx = -1, dy = -1;
+  for (auto d : game.me->all_dropoffs) {
+	dx = d->position.x;
+	dy = d->position.y;
+  }
   Position pos;
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
     for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
@@ -549,16 +554,43 @@ void updateDropoffCandidates() {
       for(int delta_x = -effect_distance; delta_x < effect_distance; delta_x++){
         for(int delta_y = -(effect_distance-abs(delta_x)); delta_y < (effect_distance-abs(delta_x)); delta_y++){
           Position cur_cell(adjust(x+delta_x, constants::WIDTH), adjust(y+delta_y, constants::HEIGHT));
-
+		  int d = abs(delta_x) + abs(delta_y);
           int h = game.game_map->at(cur_cell)->halite;
+			
+			/*
+		  if (d < distance_from_our_other_dropoffs(pos, cur_cell)) {
+			halite_quality.push_back(-h);
+			continue;
+		  }
+		  */
 
-          double optimistic_score = (double) h / 2 / (delta_x + delta_y + 1);
-          optimistic_score -= (double) h / 2 / (distance_from_our_other_dropoffs(pos, cur_cell) + 1);
-          double realistic_score = (double) optimistic_score * (100 - probability_of_invasion[cur_cell.x][cur_cell.y]);
+          double optimistic_score = (double) h / 2 / (d + 1);
+          double our_dropoff_impact = (double) h / (distance_from_our_other_dropoffs(pos, cur_cell) + 1);
+          double optimistic_score2 = optimistic_score - our_dropoff_impact;
+
+          double realistic_score = (double) optimistic_score2 * (100 - probability_of_invasion[cur_cell.x][cur_cell.y]);
           halite_quality.push_back(realistic_score);
+			
+			/*
+		  if( x == dx && y == dy ){
+			log::log("dropoff_potential | h: " + to_string(h)
+				+ " optimistic_score: " + to_string(optimistic_score)
+				+ " our_dropoff_impact: " + to_string(our_dropoff_impact)
+				+ " optimistic_score2: " + to_string(optimistic_score2)
+				+ " realistic_score: " + to_string(realistic_score)
+				+ " probability_of_invasion[cur_cell.x][cur_cell.y]: " + to_string(probability_of_invasion[cur_cell.x][cur_cell.y])
+				+ " x: " + to_string(x)
+				+ " y: " + to_string(y)
+				+ " delta_x: " + to_string(delta_x)
+				+ " delta_y: " + to_string(delta_y)
+				+ " (delta_x + delta_y + 1): " + to_string((delta_x + delta_y + 1))
+				+ " h / 2: " + to_string(h/2)
+			);
+		  }
+		  */
         }
       }
-      sort(halite_quality.begin(), halite_quality.end(), [](auto l, auto r) { return l < r; });
+      sort(halite_quality.begin(), halite_quality.end(), [](auto l, auto r) { return l > r; });
     }
   }
 }
@@ -570,6 +602,7 @@ optional<Position> shallWeInvestInDropOff() {
     return {};
   }
   int ships = game.me->ships.size();
+  pair<double, Position> best_dropoff = {-1234567890.0, Position(0,0)};
 
   vector<double> existing_potential;
   for (auto d : game.me->all_dropoffs) {
@@ -579,7 +612,7 @@ optional<Position> shallWeInvestInDropOff() {
       dropOff_potential[d->position.x][d->position.y].end()
     );
   }
-  sort(existing_potential.begin(), existing_potential.end(), [](auto l, auto r) { return l < r; });
+  sort(existing_potential.begin(), existing_potential.end(), [](auto l, auto r) { return l > r; });
 
   double combined_profit[10000];
   for(int i=0; i<10000; i++){
@@ -587,9 +620,15 @@ optional<Position> shallWeInvestInDropOff() {
     if (i < existing_potential.size()) {
       combined_profit[i] += existing_potential[i];
     }
+	/*
+	if (i < existing_potential.size() && existing_potential[i] > 0.1) {
+		log::log("i: " + to_string(i) 
+			+ " existing_potential[i]: " + to_string(existing_potential[i])
+			+ " combined_profit[i]: " + to_string(combined_profit[i])
+		);
+	}
+	*/
   }
-
-  pair<double, Position> best_dropoff;
 
   Position pos;
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
@@ -598,15 +637,32 @@ optional<Position> shallWeInvestInDropOff() {
         continue;
       }
       int d = distance_from_our_ships[pos.x][pos.y];
+      int d2 = distance_from_our_dropoffs[pos.x][pos.y];
+      int target_round = constants::HEIGHT / game.players.size() / 2;
+	  if (target_round < d || d < 0) {
+		/*
+		log::log("skipping d: " + to_string(d) 
+			+ " target_round: " + to_string(target_round)
+			+ " x: " + to_string(x) 
+			+ " y: " + to_string(y)
+			);	
+		  for (auto dropoff : game.me->all_dropoffs) {
+			log::log("dropoff->position: " + to_string(dropoff->position.x) + " : " + to_string(dropoff->position.y));
+		  }
+			*/
+		continue;
+	  } else {
+	  	//log::log("x: " + to_string(x) + " y: " + to_string(y) + " #OK");
+	  }
+
       double initial_cost = -constants::DROPOFF_COST
         -constants::SHIP_COST
-        - (combined_profit[d * ships] - combined_profit[d * (ships - 1)]);
+        - (combined_profit[d * (ships + 1)] - combined_profit[d * (ships - 1)]);
 
       // amount of harite mined at new dropoff vs all other combined (if no dropoff would be built)
       int ships_assigned_to_new_dropoff = (int) (ships + game.me->all_dropoffs.size()) / (game.me->all_dropoffs.size() + 1);
       int ships_left = ships - ships_assigned_to_new_dropoff;
       int start_point = d * (ships - 1);
-      int target_round = constants::HEIGHT / game.players.size() / 4;
       double profit = initial_cost -
         (combined_profit[target_round * ships] - combined_profit[start_point + (target_round - d - 1) * ships_left]);
       for (int round = d + 1, i=0; round < target_round && i < dropOff_potential[x][y].size(); round++) {
@@ -615,8 +671,19 @@ optional<Position> shallWeInvestInDropOff() {
         }
       }
       if(profit > get<0>(best_dropoff)){
+		log::log("found spot for dropoff | d: " + to_string(d)
+			+ " initial_cost: " + to_string(initial_cost)
+			+ " d * ships: " + to_string(d * ships)
+			+ " combined_profit[d * ships]: " + to_string(combined_profit[d * ships])
+			+ " combined_profit[d * (ships - 1)]: " + to_string(combined_profit[d * (ships - 1)])
+			+ " profit: " + to_string(profit)
+			+ " target_round: " + to_string(target_round)
+			+ " ships: " + to_string(ships)
+			+ " ships_old: " + to_string(ships_left)
+			+ " ships_new: " + to_string(ships_assigned_to_new_dropoff)
+		);
         best_dropoff = {profit, pos};
-      }
+	  }
     }
   }
 
@@ -777,6 +844,7 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   auto dropoff_assessment = shallWeInvestInDropOff();
 
   if(dropoff_assessment) {
+	log::log("WE ARE BUILDING DROPOFF");
     savings += constants::DROPOFF_COST;
     Position pos = *dropoff_assessment;
     faking_dropoff[pos.x][pos.y] = true;
@@ -796,9 +864,11 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
           continue;
       }
     }
+	log::log("WE ARE BUILDING DROPOFF #2");
     game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
     game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
     game.game_map->at(position)->structure = game.me->dropoffs.back();
+	log::log("WE ARE BUILDING DROPOFF #3");
   }
 
   for(auto& position : abandoned_dropoffs){
@@ -851,7 +921,14 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
            to_string(duration_cast<duration<double>>(
                          high_resolution_clock::now() - t1)
                          .count()) +
-           " ships: " + to_string(me->ships.size()));
+           " ships: " + to_string(me->ships.size())
+		   + " me->halite: " + to_string(me->halite)
+		   + " savings: " + to_string(savings)
+		   + " constants::SHIP_COST: " + to_string(constants::SHIP_COST)
+		   //+ " me->halite - savings >= constants::SHIP_COST: " + to_string((bool)me->halite - savings >= constants::SHIP_COST)
+		   //+ " !(game_map->at(me->shipyard->position)->is_occupied()): " + to_string((bool) !(game_map->at(me->shipyard->position)->is_occupied()))
+		   //+ " should_ship_new_ship(): " + to_string(should_ship_new_ship())
+		   );
   auto spawn_ship = me->halite - savings >= constants::SHIP_COST &&
              !(game_map->at(me->shipyard->position)->is_occupied()) &&
              should_ship_new_ship();
