@@ -106,7 +106,7 @@ namespace hlt {
           return true;
         }
 
-        bool is_safe(Position& pos, int halite=0, bool recall=false){
+        bool is_safe(Position& pos, int halite=0, bool recall=false, bool aggressive=false){
           if(recall &&  has_my_structure(pos)){ // When recall always enter in the base. Even if you crash friends
             return true;
           }
@@ -117,7 +117,7 @@ namespace hlt {
             return false;
           }
 
-          if(halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin){ // If it's not vulnerable place it's fine. If way lighter enemy ship will be there in one step, not safe. #TODO need to reconsider. Depends on the player aggressivnes and ship displacement
+          if(aggressive || (halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin)){ // If it's not vulnerable place it's fine. If way lighter enemy ship will be there in one step, not safe. #TODO need to reconsider. Depends on the player aggressivnes and ship displacement
               return true;
           }
 
@@ -125,13 +125,13 @@ namespace hlt {
         }
 
         Position _safe_moves_position;
-        std::vector<Direction> get_safe_moves(shared_ptr<Ship> ship, const Position& destination, bool recall=false) {
+        std::vector<Direction> get_safe_moves(shared_ptr<Ship> ship, const Position& destination, bool recall=false, bool aggressive=false) {
           auto directions = get_unsafe_moves(ship->position, destination);
           std::vector<Direction> safe_directions;
 
           for(auto direction : directions){
             ship->position.directional_offset(_safe_moves_position, direction);
-            if(is_safe(_safe_moves_position, ship->halite, recall)){
+            if(is_safe(_safe_moves_position, ship->halite, recall, aggressive)){
                 safe_directions.push_back(direction);
             }
           }
@@ -139,7 +139,7 @@ namespace hlt {
           if(safe_directions.size() == 0 && !is_safe(ship->position)){
             for(auto direction : directions){
               ship->position.directional_offset(_safe_moves_position, direction);
-              if(is_safe(_safe_moves_position, 0, recall)){
+              if(is_safe(_safe_moves_position, 0, recall, aggressive)){
                   safe_directions.push_back(direction);
               }
             }

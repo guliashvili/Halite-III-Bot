@@ -139,9 +139,7 @@ void navigate(const shared_ptr<Ship> ship, const Direction &direction,
   direction_queue.emplace_back(ship, direction);
 }
 
-Direction greedySquareMove(shared_ptr<Ship> ship, Position &target,
-                           bool recall = false) {
-  auto directions = game.game_map->get_safe_moves(ship, target, recall);
+Direction greedySquareMove(shared_ptr<Ship> ship, vector<Direction> directions) {
   if (directions.size() == 0) {
     return Direction::STILL;
   } else if (directions.size() == 1) {
@@ -160,7 +158,7 @@ Direction greedySquareMove(shared_ptr<Ship> ship, Position &target,
       return directions[1];
     } else if (b->move_cost() - a->move_cost() <
                genes->greedy_walk_randomisation_margin) {
-      srand(ship->id * game.turn_number * target.x * target.y * genes->seed);
+      srand(ship->id * game.turn_number * genes->seed);
       return directions[rand() % directions.size()];
     } else {
       return directions[0];
@@ -190,6 +188,27 @@ getMinDistanceToDropoff(Position &position,
   return minDistance;
 }
 
+int is_blocked_steps[1000] = {0};
+
+Direction somehow_going_home(shared_ptr<Ship> ship, Position target, bool recall, Direction dir){
+  if(dir == Direction::STILL && game.game_map->can_move(ship)){
+    is_blocked_steps[ship->id]++;
+  }else{
+    is_blocked_steps[ship->id] = 0;
+  }
+
+  if(is_blocked_steps[ship->id] >= 2){
+    dir = greedySquareMove(ship, game.game_map->get_safe_moves(ship, target, recall, true)); // ignore probability of enemy collision
+  }
+
+  if(dir != Direction::STILL){
+      is_blocked_steps[ship->id] = 0;
+  }
+
+
+  return dir;
+}
+
 std::optional<Direction> isRecallTime(shared_ptr<Ship> ship) {
   auto minDstDropoff =
       getMinDistanceToDropoff(ship->position, me->all_dropoffs);
@@ -198,8 +217,10 @@ std::optional<Direction> isRecallTime(shared_ptr<Ship> ship) {
        me->ships.size() / 10.0 / me->all_dropoffs.size())) {
     return {};
   }
-  return greedySquareMove(ship, minDstDropoff.second->position,
-                          true); // TODO might stand still when blocked
+
+  Direction dir = greedySquareMove(ship, game.game_map->get_safe_moves(ship, minDstDropoff.second->position, true));
+
+  return somehow_going_home(ship,  minDstDropoff.second->position, true, dir);
 }
 
 bool shouldGoHome(shared_ptr<Ship> ship) {
@@ -215,7 +236,7 @@ int DP_MARK = 1;
 vector<tuple<int, Direction, int>>
 compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
   if (get_milisecond_left() < 10*game.me->ships.size()) {
-    return {{0, greedySquareMove(ship, target, recall), 0}};
+    return {{0, greedySquareMove(ship, game.game_map->get_safe_moves(ship, target, recall)), 0}};
   }
 
   DP_MARK++;
@@ -381,9 +402,9 @@ Direction goHome(shared_ptr<Ship> ship) {
   auto minDstDropoff =
       getMinDistanceToDropoff(ship->position, me->all_dropoffs);
 
-  return goToPointEfficient(
+  return somehow_going_home(ship, minDstDropoff.second->position, false, goToPointEfficient(
       ship,
-      minDstDropoff.second->position); // TODO might stand still when blocked
+      minDstDropoff.second->position));
 }
 
 vector<tuple<unsigned, Position, double>> _candidates;
