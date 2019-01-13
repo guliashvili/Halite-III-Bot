@@ -18,11 +18,13 @@ namespace hlt {
         PlayerId me = -1;
         shared_ptr<Genes> genes;
         vector<Direction> *ship_will_go_to;
+        bool play_cautious;
 
-        void init(PlayerId me_, shared_ptr<Genes> genes_, vector<Direction> ship_will_go_to_[1000]){
+        void init(PlayerId me_, shared_ptr<Genes> genes_, vector<Direction> ship_will_go_to_[1000], bool play_cautious_){
           me = me_;
           genes = genes_;
           ship_will_go_to = ship_will_go_to_;
+          play_cautious = play_cautious_;
         }
 
         MapCell* at(const Position& position) {
@@ -83,7 +85,7 @@ namespace hlt {
         Position _min_halite_next_pos;
         int _get_min_halite_enemy(const Position& position){
           int mn = 9999;
-          for(auto direction : ALL_CARDINALS){
+          for(auto direction : ALL_CARDINALS_ST){
             position.directional_offset(_min_halite_next_pos, direction);
             if(at(_min_halite_next_pos)->is_occupied() && at(_min_halite_next_pos)->ship->owner != me){
                 int ship_id = at(_min_halite_next_pos)->ship->id;
@@ -113,11 +115,13 @@ namespace hlt {
           if((!at(pos)->is_occupied() || at(pos)->ship->owner != me) && has_my_structure(pos)){ // Always crash enemy in the base
             return true;
           }
-          if(at(pos)->is_occupied()){ // In general if occupied don't crash. #TODO we need to reconsider. We can have enemy movement analytics
-            return false;
+          if(at(pos)->is_occupied()){
+            if(play_cautious ||  at(pos)->ship->owner == me){ // In general if occupied don't crash. #TODO we need to reconsider. We can have enemy movement analytics
+              return false;
+            }
           }
 
-          if(aggressive || (halite - _get_min_halite_enemy(pos) < genes->collision_caution_margin)){ // If it's not vulnerable place it's fine. If way lighter enemy ship will be there in one step, not safe. #TODO need to reconsider. Depends on the player aggressivnes and ship displacement
+          if(aggressive || (halite - _get_min_halite_enemy(pos) < (play_cautious?-0.5:1)*genes->collision_caution_margin)){ // If it's not vulnerable place it's fine. If way lighter enemy ship will be there in one step, not safe. #TODO need to reconsider. Depends on the player aggressivnes and ship displacement
               return true;
           }
 
