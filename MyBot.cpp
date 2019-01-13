@@ -1,7 +1,7 @@
-#include "hlt/constants.hpp"
-#include "hlt/game.hpp"
-#include "hlt/genes.hpp"
-#include "hlt/log.hpp"
+#include "ref/constants.hpp"
+#include "ref/game.hpp"
+#include "ref/genes.hpp"
+#include "ref/log.hpp"
 
 #include <algorithm>
 #include <array>
@@ -109,17 +109,6 @@ void updatePositionsOfOpponentsStuff() {
   }
 }
 
-int NUM_OF_MOVES_FROM_HOME[1000] = {0};
-double AVERAGE_TIME_TO_HOME = 0;
-
-double AVERAGE_EFFICIENCY = 0;
-
-double AVERAGE_WASTE = 0;
-double TRAVEL_WASTE[10000] = {0};
-
-double STEPS_WASTED_WALKING[10000] = {0};
-double AVERAGE_STEPS_WASTED = 0;
-
 // [1.0, 2 ^ (PLAYERS-1)] - impact of opponents dropoffs on the area
 double getDropoffImpact(Position pos, Position dropoff){
   const int num_of_players = game.players.size();
@@ -131,9 +120,6 @@ double impactOfOpponentsDropoffs(Position pos) {
   double impact = 1.0;
   for (auto dropoff : opponents_dropoffs) {
     impact *= getDropoffImpact(pos, dropoff);
-  }
-  for(auto dropoff : game.me->all_dropoffs){
-    impact *= getDropoffImpact(pos, dropoff->position) * 3.0;
   }
   return impact;
 }
@@ -153,7 +139,9 @@ void navigate(const shared_ptr<Ship> ship, const Direction &direction,
   direction_queue.emplace_back(ship, direction);
 }
 
-Direction greedySquareMove(shared_ptr<Ship> ship, vector<Direction> directions) {
+Direction greedySquareMove(shared_ptr<Ship> ship, Position &target,
+                           bool recall = false) {
+  auto directions = game.game_map->get_safe_moves(ship, target, recall);
   if (directions.size() == 0) {
     return Direction::STILL;
   } else if (directions.size() == 1) {
@@ -172,7 +160,7 @@ Direction greedySquareMove(shared_ptr<Ship> ship, vector<Direction> directions) 
       return directions[1];
     } else if (b->move_cost() - a->move_cost() <
                genes->greedy_walk_randomisation_margin) {
-      srand(ship->id * game.turn_number * genes->seed);
+      srand(ship->id * game.turn_number * target.x * target.y * genes->seed);
       return directions[rand() % directions.size()];
     } else {
       return directions[0];
@@ -202,27 +190,6 @@ getMinDistanceToDropoff(Position &position,
   return minDistance;
 }
 
-int is_blocked_steps[1000] = {0};
-
-Direction somehow_going_home(shared_ptr<Ship> ship, Position target, bool recall, Direction dir){
-  if(dir == Direction::STILL && game.game_map->can_move(ship)){
-    is_blocked_steps[ship->id]++;
-  }else{
-    is_blocked_steps[ship->id] = 0;
-  }
-
-  if(is_blocked_steps[ship->id] >= 2){
-    dir = greedySquareMove(ship, game.game_map->get_safe_moves(ship, target, recall, true)); // ignore probability of enemy collision
-  }
-
-  if(dir != Direction::STILL){
-      is_blocked_steps[ship->id] = 0;
-  }
-
-
-  return dir;
-}
-
 std::optional<Direction> isRecallTime(shared_ptr<Ship> ship) {
   auto minDstDropoff =
       getMinDistanceToDropoff(ship->position, me->all_dropoffs);
@@ -231,10 +198,8 @@ std::optional<Direction> isRecallTime(shared_ptr<Ship> ship) {
        me->ships.size() / 10.0 / me->all_dropoffs.size())) {
     return {};
   }
-
-  Direction dir = greedySquareMove(ship, game.game_map->get_safe_moves(ship, minDstDropoff.second->position, true));
-
-  return somehow_going_home(ship,  minDstDropoff.second->position, true, dir);
+  return greedySquareMove(ship, minDstDropoff.second->position,
+                          true); // TODO might stand still when blocked
 }
 
 bool shouldGoHome(shared_ptr<Ship> ship) {
@@ -250,7 +215,7 @@ int DP_MARK = 1;
 vector<tuple<int, Direction, int>>
 compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
   if (get_milisecond_left() < 10*game.me->ships.size()) {
-    return {{0, greedySquareMove(ship, game.game_map->get_safe_moves(ship, target, recall)), 0}};
+    return {{0, greedySquareMove(ship, target, recall), 0}};
   }
 
   DP_MARK++;
@@ -379,6 +344,8 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
   return efficient_possibilities;
 }
 
+int NUM_OF_MOVES_FROM_HOME[1000] = {0};
+
 Direction goToPointEfficient(shared_ptr<Ship> ship, Position destination) {
   const auto dp_results = compute_dp_walk(ship, destination);
   if (dp_results.size() == 0) {
@@ -414,9 +381,9 @@ Direction goHome(shared_ptr<Ship> ship) {
   auto minDstDropoff =
       getMinDistanceToDropoff(ship->position, me->all_dropoffs);
 
-  return somehow_going_home(ship, minDstDropoff.second->position, false, goToPointEfficient(
+  return goToPointEfficient(
       ship,
-      minDstDropoff.second->position));
+      minDstDropoff.second->position); // TODO might stand still when blocked
 }
 
 vector<tuple<unsigned, Position, double>> _candidates;
@@ -492,11 +459,7 @@ void pair_ships(vector<shared_ptr<Ship>> &ships,
   }
 }
 
-
-
-
-// double MAX_RADIUS[100000];
-// double AVERAGE_MAX_RADIUS = 0;
+int AVERAGE_TIME_TO_HOME = 0;
 
 bool should_ship_new_ship() {
   int total_me = game.me->ships.size();
@@ -523,12 +486,12 @@ bool should_ship_new_ship() {
 // int map_halite_clone[64][64];
 
 vector<Position> faking_dropoffs;
-int dropoff_cooldown = 0;
 bool isTimeToDropoff(){
   return game.turn_number > 50 && game.me->ships.size() > 20 && (faking_dropoffs.size() + game.me->dropoffs.size()) == 0;
 }
 
 Position find_dropoff_place(){
+
   pair<double, Position> best_dropoff;
   best_dropoff.first = -1;
   Position pos;
@@ -537,14 +500,6 @@ Position find_dropoff_place(){
       if(game.game_map->at(pos)->has_structure() || faking_dropoff[pos.x][pos.y]){
         continue;
       }
-      // auto minDstDropoff =
-      //     getMinDistanceToDropoff(pos, me->all_dropoffs);
-      // if(get<0>(minDstDropoff) > 20){
-      //   continue;
-      // }
-      // if(get<0>(minDstDropoff) < 15){
-      //   continue;
-      // }
       const int effect_distance = constants::WIDTH / game.players.size() / 4;
 
       double total_halite_in_range = 0;
@@ -681,7 +636,7 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   vector<Command> constructions;
   me = game.me;
   unique_ptr<GameMap> &game_map = game.game_map;
-  game_map->init(me->id, genes, analytics_ship_will_go_to, game.players.size() == 4);
+  game_map->init(me->id, genes, analytics_ship_will_go_to);
 
   updatePositionsOfOpponentsStuff();
 
@@ -706,8 +661,16 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   vector<shared_ptr<Ship>> ships;
 
   for (const auto &ship : me->ships) {
-    // ship returned to dropoff
-
+    // ship returned to shipyard (which is used as dropoff point)
+    // currently we do not have any other dropoffs except shipyard
+    if (game_map->has_my_structure(ship->position)) {
+      // GOING_HOME[ship->id] = false;
+      AVERAGE_TIME_TO_HOME =
+          AVERAGE_TIME_TO_HOME * genes->average_time_home_decay +
+          NUM_OF_MOVES_FROM_HOME[ship->id] *
+              (1 - genes->average_time_home_decay);
+      NUM_OF_MOVES_FROM_HOME[ship->id] = 0;  // at home (shipyard)
+    }
     if (game_map->has_my_structure(ship->position) && faking_dropoff[ship->position.x][ship->position.y]){
       if(me->halite >= constants::DROPOFF_COST){
         me->halite -= constants::DROPOFF_COST;
@@ -715,13 +678,12 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
         faking_dropoff[ship->position.x][ship->position.y] = false;
         faking_dropoffs.erase(std::remove(faking_dropoffs.begin(), faking_dropoffs.end(), ship->position), faking_dropoffs.end());
         constructions.push_back(ship->make_dropoff());
-        dropoff_cooldown = 20;
       }else{
         direction_queue.emplace_back(ship, Direction::STILL);
       }
     }else if (!game_map->can_move(ship)) {
       navigate(ship, Direction::STILL, direction_queue);
-    }else if(game_map->get_safe_from_enemy_moves_around(ship).size() == 0) { //TODO check
+    }else if(game_map->get_safe_from_enemy_moves_around(ship).size() == 0) {
       navigate(ship, Direction::STILL, direction_queue);
     }else {
       game.game_map->at(ship->position)->mark_safe();
@@ -738,50 +700,11 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
     NUM_OF_MOVES_FROM_HOME[ship->id]++;
   }
 
-  bool had_structure = false;
-  for(const auto& [ship, direction] : direction_queue){
-    Position next_pos = ship->position.directional_offset(direction);
-    if(direction != Direction::STILL){
-      TRAVEL_WASTE[ship->id] += game.game_map->at(ship->position)->move_cost();
-      STEPS_WASTED_WALKING[ship->id]++;
-    }
-    if (game_map->has_my_structure(next_pos)) {
-      had_structure = true;
-      // GOING_HOME[ship->id] = false;
-      if(next_pos != ship->position){
-        AVERAGE_TIME_TO_HOME =
-            AVERAGE_TIME_TO_HOME * genes->average_time_home_decay +
-            NUM_OF_MOVES_FROM_HOME[ship->id] *
-                (1 - genes->average_time_home_decay);
-
-        // log::log("AVERAGES contrib " + to_string(NUM_OF_MOVES_FROM_HOME[ship->id]) +  " " + to_string(TRAVEL_WASTE[ship->id]));
-        if(NUM_OF_MOVES_FROM_HOME[ship->id] > 0){
-          AVERAGE_EFFICIENCY =
-              AVERAGE_EFFICIENCY * genes->average_time_home_decay +
-              ship->halite * 1.0 / NUM_OF_MOVES_FROM_HOME[ship->id] *
-                  (1 - genes->average_time_home_decay);
-
-          AVERAGE_WASTE =
-              AVERAGE_WASTE * genes->average_time_home_decay +
-              TRAVEL_WASTE[ship->id] / NUM_OF_MOVES_FROM_HOME[ship->id]*
-                  (1 - genes->average_time_home_decay);
-        }
-        AVERAGE_STEPS_WASTED = AVERAGE_STEPS_WASTED * genes->average_time_home_decay +  STEPS_WASTED_WALKING[ship->id]*(1 - genes->average_time_home_decay);
-
-        NUM_OF_MOVES_FROM_HOME[ship->id] = 0;  // at home (shipyard)
-        TRAVEL_WASTE[ship->id] = 0;
-        STEPS_WASTED_WALKING[ship->id] = 0;
-      }
-    }
-  }
-  if(had_structure){
-    log::log("AVERAGES " +to_string(AVERAGE_STEPS_WASTED*1.0/AVERAGE_TIME_TO_HOME * (AVERAGE_WASTE+AVERAGE_EFFICIENCY) ) +" " +to_string(AVERAGE_STEPS_WASTED*1.0/AVERAGE_TIME_TO_HOME * (constants::MAX_TURNS - game.turn_number) * (AVERAGE_WASTE+AVERAGE_EFFICIENCY) )  + " wasted_steps:" +  to_string(AVERAGE_STEPS_WASTED) + " move_cost:" + to_string(AVERAGE_WASTE) +  " efficiency:" + to_string(AVERAGE_EFFICIENCY) + " trip_length:" + to_string(AVERAGE_TIME_TO_HOME));
-  }
-  // log::log("doStep duration: " +
-  //          to_string(duration_cast<duration<double>>(
-  //                        high_resolution_clock::now() - t1)
-  //                        .count()) +
-  //          " ships: " + to_string(me->ships.size()));
+  log::log("doStep duration: " +
+           to_string(duration_cast<duration<double>>(
+                         high_resolution_clock::now() - t1)
+                         .count()) +
+           " ships: " + to_string(me->ships.size()));
   auto spawn_ship = me->halite - savings >= constants::SHIP_COST &&
              !(game_map->at(me->shipyard->position)->is_occupied()) &&
              should_ship_new_ship();
