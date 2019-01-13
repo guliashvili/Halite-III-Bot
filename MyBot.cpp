@@ -547,6 +547,9 @@ void updateDropoffCandidates() {
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
     for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
       const int effect_distance = constants::WIDTH / game.players.size() / game.players.size();
+      if(min(distance_from_their_dropoffs[pos.x][pos.y],distance_from_our_dropoffs[pos.x][pos.y]) < 8){
+        continue;
+      }
 
       vector<double> &halite_quality = dropOff_potential[x][y];
       halite_quality.clear();
