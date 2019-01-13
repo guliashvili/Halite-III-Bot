@@ -396,6 +396,7 @@ void pair_ships(vector<shared_ptr<Ship>> &ships,
   auto &candidates = _candidates;
   candidates.resize(0);
 
+  const int steps_left = constants::MAX_TURNS - game.turn_number;
   vector<tuple<shared_ptr<Ship>, Direction>> ret;
 
   {
@@ -416,10 +417,12 @@ void pair_ships(vector<shared_ptr<Ship>> &ships,
         for (unsigned i = 0; i < ships.size(); i++) {
           auto ship = ships[i];
           int distance = game.game_map->calculate_distance(ship->position, pos);
-          candidates.emplace_back(i, pos,
-                                  min(constants::MAX_HALITE - ship->halite,
-                                      target_halite_amount - 3) /
-                                      double(distance + 1));
+          if((distance+get<0>(getMinDistanceToDropoff(ship->position, game.me->all_dropoffs)))*1.1 < steps_left){
+            candidates.emplace_back(i, pos,
+                                    min(constants::MAX_HALITE - ship->halite,
+                                        target_halite_amount - 3) /
+                                        double(distance + 1));
+          }
         }
       }
     }
