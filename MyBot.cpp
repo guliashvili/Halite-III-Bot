@@ -592,7 +592,7 @@ void updateDropoffCandidates() {
           }
         }
       }
-      sort(halite_quality.begin(), halite_quality.end(), [](auto l, auto r) { return l > r; });
+      sort(halite_quality.begin(), halite_quality.end());
     }
   }
 }
@@ -619,7 +619,7 @@ optional<Position> shallWeInvestInDropOff() {
       dropOff_potential[d->position.x][d->position.y].end()
     );
   }
-  sort(existing_potential.begin(), existing_potential.end(), [](auto l, auto r) { return l > r; });
+  sort(existing_potential.begin(), existing_potential.end());
 
   double combined_profit[10000];
   for(int i=0; i<10000; i++){
