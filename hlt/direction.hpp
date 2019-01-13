@@ -14,7 +14,9 @@ namespace hlt {
         STILL = 'o',
         NONE = '-',
     };
-
+    static const std::array<Direction, 5> ALL_CARDINALS_ST = {
+            { Direction::NORTH, Direction::SOUTH, Direction::EAST, Direction::WEST, Direction::STILL }
+        };
     static const std::array<Direction, 4> ALL_CARDINALS = {
         { Direction::NORTH, Direction::SOUTH, Direction::EAST, Direction::WEST }
     };

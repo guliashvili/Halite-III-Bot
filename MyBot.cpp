@@ -1,7 +1,7 @@
-#include "ref/constants.hpp"
-#include "ref/game.hpp"
-#include "ref/genes.hpp"
-#include "ref/log.hpp"
+#include "hlt/constants.hpp"
+#include "hlt/game.hpp"
+#include "hlt/genes.hpp"
+#include "hlt/log.hpp"
 
 #include <algorithm>
 #include <array>
@@ -636,7 +636,7 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   vector<Command> constructions;
   me = game.me;
   unique_ptr<GameMap> &game_map = game.game_map;
-  game_map->init(me->id, genes, analytics_ship_will_go_to);
+  game_map->init(me->id, genes, analytics_ship_will_go_to, game.players.size() == 4);
 
   updatePositionsOfOpponentsStuff();
 
