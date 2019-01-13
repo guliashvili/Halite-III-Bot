@@ -546,7 +546,7 @@ void updateDropoffCandidates() {
   Position pos;
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
     for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
-      const int effect_distance = constants::WIDTH / game.players.size();
+      const int effect_distance = constants::WIDTH / game.players.size() / game.players.size();
 
       vector<double> &halite_quality = dropOff_potential[x][y];
       halite_quality.clear();
@@ -554,9 +554,15 @@ void updateDropoffCandidates() {
         for(int delta_y = -(effect_distance-abs(delta_x)); delta_y < (effect_distance-abs(delta_x)); delta_y++){
           Position cur_cell(adjust(x+delta_x, constants::WIDTH), adjust(y+delta_y, constants::HEIGHT));
           int d = abs(delta_x) + abs(delta_y);
-          if (d > distance_from_our_other_dropoffs(pos, cur_cell)) {
-           continue;
+          if(d < distance_from_our_dropoffs[cur_cell.x][cur_cell.y]){
+
+          } else if(d > distance_from_our_other_dropoffs(pos, cur_cell)){
+            continue;
           }
+
+          // if (d > distance_from_our_other_dropoffs(pos, cur_cell)) {
+          //  continue;
+          // }
 
           int h = game.game_map->at(cur_cell)->halite;
           double optimistic_score = (double) h / 2 / (d + 1);
@@ -790,9 +796,19 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   game_map->init(me->id, genes, analytics_ship_will_go_to);
 
   updatePositionsOfOpponentsStuff();
+    auto hm_xxx = high_resolution_clock::now();
   updateDropoffCandidates();
+  log::log("Shall we " +
+           to_string(duration_cast<duration<double>>(
+                         high_resolution_clock::now() - hm_xxx
+                       ).count()));
 
+  auto xxx = high_resolution_clock::now();
   auto dropoff_assessment = shallWeInvestInDropOff();
+  log::log("Shall we " +
+           to_string(duration_cast<duration<double>>(
+                         high_resolution_clock::now() - xxx
+                       ).count()));
 
   if(dropoff_assessment) {
     savings += constants::DROPOFF_COST;
