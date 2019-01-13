@@ -562,8 +562,8 @@ void updateDropoffCandidates() {
   Position pos;
   for(int &x = pos.x = 0; x < constants::WIDTH; x++){
     for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
-      const int effect_distance = constants::WIDTH / game.players.size() / game.players.size();
-      if(min(distance_from_their_dropoffs[pos.x][pos.y],distance_from_our_dropoffs[pos.x][pos.y]) < 8){
+      const int effect_distance = constants::WIDTH / game.players.size() / game.players.size()/ game.players.size();
+      if(min(distance_from_their_dropoffs[pos.x][pos.y],distance_from_our_dropoffs[pos.x][pos.y]) < 10){
         continue;
       }
 
