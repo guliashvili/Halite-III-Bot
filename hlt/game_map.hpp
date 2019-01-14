@@ -116,10 +116,10 @@ namespace hlt {
             return true;
           }
           if(at(pos)->is_occupied()){
-            if(play_cautious ||  at(pos)->ship->owner == me){ // In general if occupied don't crash. #TODO we need to reconsider. We can have enemy movement analytics
-              return false;
-            }
-          }
+           if(play_cautious ||  at(pos)->ship->owner == me){ // In general if occupied don't crash. #TODO we need to reconsider. We can have enemy movement analytics
+             return false;
+           }
+         }
 
           if(aggressive || (halite - _get_min_halite_enemy(pos) < (play_cautious?-0.5:1)*genes->collision_caution_margin)){ // If it's not vulnerable place it's fine. If way lighter enemy ship will be there in one step, not safe. #TODO need to reconsider. Depends on the player aggressivnes and ship displacement
               return true;
