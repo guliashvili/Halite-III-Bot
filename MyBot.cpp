@@ -598,11 +598,12 @@ void updateDropoffCandidates() {
 }
 
 vector<Position> faking_dropoffs;
-static map<int,int> num_of_dropoffs = {{32,1}, {40,2}, {48,2}, {56,3}, {64,4}};
+static map<int,int> num_of_dropoffs = {{32,1}, {40,1}, {48,1}, {56,2}, {64,2}};
 
 optional<Position> shallWeInvestInDropOff() {
-  if (!faking_dropoffs.empty() ||
-    time_since_last_dropoff < 25 ||
+  const static int num_of_dropoff = max(1, int(analytics_total_halite/game.players.size()/200000));
+  log::log("num drop: " + to_string(num_of_dropoff));
+  if (
     game.turn_number < 75 ||
     constants::MAX_TURNS - game.turn_number < 100 ||
     game.me->all_dropoffs.size() > num_of_dropoffs[constants::HEIGHT]) {
@@ -814,20 +815,48 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   unique_ptr<GameMap> &game_map = game.game_map;
   game_map->init(me->id, genes, analytics_ship_will_go_to, game.players.size() == 4);
 
-  updatePositionsOfOpponentsStuff();
-    auto hm_xxx = high_resolution_clock::now();
-  updateDropoffCandidates();
-  log::log("Shall we " +
-           to_string(duration_cast<duration<double>>(
-                         high_resolution_clock::now() - hm_xxx
-                       ).count()));
 
-  auto xxx = high_resolution_clock::now();
+{
+  vector<Position> abandoned_dropoffs;
+  vector<Position*> assess;
+  for(auto &position : faking_dropoffs){
+    if(game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id){
+      faking_dropoff[position.x][position.y] = false;
+      assess.push_back(&position);
+    }
+    game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
+    game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
+    game.game_map->at(position)->structure = game.me->dropoffs.back();
+  }
+  for(Position* position : assess){
+    log::log("running backup");
+    auto dropoff_assessment = shallWeInvestInDropOff();
+
+    if(dropoff_assessment){
+      *position = *dropoff_assessment;
+      faking_dropoff[position->x][position->y] = true;
+    }else{
+        abandoned_dropoffs.push_back(*position);
+        continue;
+    }
+    game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position->x, position->y));
+    game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position->x, position->y));
+    game.game_map->at(*position)->structure = game.me->dropoffs.back();
+  }
+
+  for(auto& position : abandoned_dropoffs){
+    faking_dropoffs.erase(std::remove(faking_dropoffs.begin(), faking_dropoffs.end(), position), faking_dropoffs.end());
+  }
+}
+
+  updatePositionsOfOpponentsStuff();
+  updateDropoffCandidates();
+
+
+
+  log::log("running normal");
   auto dropoff_assessment = shallWeInvestInDropOff();
-  log::log("Shall we " +
-           to_string(duration_cast<duration<double>>(
-                         high_resolution_clock::now() - xxx
-                       ).count()));
+
 
   if(dropoff_assessment) {
     savings += constants::DROPOFF_COST;
@@ -839,27 +868,6 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
     time_since_last_dropoff++;
   }
 
-  vector<Position> abandoned_dropoffs;
-  for(auto &position : faking_dropoffs){
-    if(game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id){
-      faking_dropoff[position.x][position.y] = false;
-      auto dropoff_assessment = shallWeInvestInDropOff();
-      if(dropoff_assessment){
-        position = *dropoff_assessment;
-        faking_dropoff[position.x][position.y] = true;
-      }else{
-          abandoned_dropoffs.push_back(position);
-          continue;
-      }
-    }
-    game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
-    game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
-    game.game_map->at(position)->structure = game.me->dropoffs.back();
-  }
-
-  for(auto& position : abandoned_dropoffs){
-    faking_dropoffs.erase(std::remove(faking_dropoffs.begin(), faking_dropoffs.end(), position), faking_dropoffs.end());
-  }
 
   vector<shared_ptr<Ship>> ships;
 
