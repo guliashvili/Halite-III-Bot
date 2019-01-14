@@ -14,11 +14,12 @@
 #include <unordered_map>
 #include <cmath>
 #include <set>
+#include <map>
 
 using namespace std;
 using namespace hlt;
 using namespace std::chrono;
-
+int time_since_last_dropoff = 0;
 shared_ptr<Genes> genes;
 Game game;
 shared_ptr<Player> me;
@@ -120,6 +121,9 @@ double impactOfOpponentsDropoffs(Position pos) {
   double impact = 1.0;
   for (auto dropoff : opponents_dropoffs) {
     impact *= getDropoffImpact(pos, dropoff);
+  }
+  for (auto dropoff : game.me->all_dropoffs) {
+    impact *= getDropoffImpact(pos, dropoff->position)*2;
   }
   return impact;
 }
@@ -465,19 +469,20 @@ void pair_ships(vector<shared_ptr<Ship>> &ships,
 int AVERAGE_TIME_TO_HOME = 0;
 
 bool should_ship_new_ship() {
-  int total_me = game.me->ships.size();
+  double total_me = game.me->ships.size();
   if (total_me == 0) {
     return true;
   }
 
-  int total_ships_count = 0;
+  double total_ships_count = 0;
   for (const auto &player : game.players) {
     total_ships_count += player->ships.size();
   }
 
-  int current_halite_prediction = analytics_total_halite * total_me / total_ships_count;
-  int next_halite_prediction =
-      analytics_total_halite * (total_me + 1) / (total_ships_count + 1);
+  double current_halite_prediction = analytics_total_halite * total_me / total_ships_count;
+  double add = 1;// + game.me->dropoffs.size()*1.0/game.players.size()/game.players.size();
+  double next_halite_prediction =
+      analytics_total_halite * (total_me + add) / (total_ships_count + add);
 
   return next_halite_prediction - current_halite_prediction >
              genes->margin_to_create_new_ship &&
@@ -487,10 +492,13 @@ bool should_ship_new_ship() {
 
 
 // int map_halite_clone[64][64];
-
+map<int,int> num_of_dropoffs = {{32,1}, {40,1}, {48,1}, {56,1}, {64,2}};
 vector<Position> faking_dropoffs;
 bool isTimeToDropoff(){
-  return game.turn_number > 50 && game.me->ships.size() > 20 && (faking_dropoffs.size() + game.me->dropoffs.size()) == 0;
+  return time_since_last_dropoff > 5 &&
+         game.turn_number > 50 &&
+         game.me->ships.size() > 20 &&
+         game.me->all_dropoffs.size() <= num_of_dropoffs[constants::HEIGHT];
 }
 
 Position find_dropoff_place(){
@@ -503,6 +511,10 @@ Position find_dropoff_place(){
       if(game.game_map->at(pos)->has_structure() || faking_dropoff[pos.x][pos.y]){
         continue;
       }
+      if(get<0>(getMinDistanceToDropoff(pos, game.me->all_dropoffs)) < 8){
+        continue;
+      }
+
       const int effect_distance = constants::WIDTH / game.players.size() / 4;
 
       double total_halite_in_range = 0;
@@ -641,6 +653,38 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
   unique_ptr<GameMap> &game_map = game.game_map;
   game_map->init(me->id, genes, analytics_ship_will_go_to, game.players.size() == 4);
 
+
+
+  {
+    vector<Position> abandoned_dropoffs;
+    vector<Position*> assess;
+    for(auto &position : faking_dropoffs){
+      if(game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id){
+        faking_dropoff[position.x][position.y] = false;
+        assess.push_back(&position);
+      }
+      game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
+      game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
+      game.game_map->at(position)->structure = game.me->dropoffs.back();
+    }
+    for(Position* position : assess){
+      log::log("running backup");
+      *position = find_dropoff_place();
+      faking_dropoff[position->x][position->y] = true;
+
+      game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position->x, position->y));
+      game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position->x, position->y));
+      game.game_map->at(*position)->structure = game.me->dropoffs.back();
+    }
+
+    for(auto& position : abandoned_dropoffs){
+      faking_dropoffs.erase(std::remove(faking_dropoffs.begin(), faking_dropoffs.end(), position), faking_dropoffs.end());
+    }
+  }
+
+
+
+
   updatePositionsOfOpponentsStuff();
 
   if(isTimeToDropoff()){
@@ -648,17 +692,12 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
     Position pos = find_dropoff_place();
     faking_dropoff[pos.x][pos.y] = true;
     faking_dropoffs.push_back(pos);
-  }
-
-  for(auto &position : faking_dropoffs){
-    if(me->halite < 3000 || (game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id)){
-      faking_dropoff[position.x][position.y] = false;
-      position = find_dropoff_place();
-      faking_dropoff[position.x][position.y] = true;
-    }
-    game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
-    game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
-    game.game_map->at(position)->structure = game.me->dropoffs.back();
+    time_since_last_dropoff = 0;
+    game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, pos.x, pos.y));
+    game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, pos.x, pos.y));
+    game.game_map->at(pos)->structure = game.me->dropoffs.back();
+  } else {
+    time_since_last_dropoff++;
   }
 
   vector<shared_ptr<Ship>> ships;
