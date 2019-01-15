@@ -360,9 +360,9 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
   for (int turn = 0; turn < MAX_CUR_TURN; turn++) {
     if (get<2>(dp[target.x][target.y][turn]) == DP_MARK) {
       // if(game.players.size() != 2){
-        if(no_stay_still && (get<1>(dp[target.x][target.y][turn]) == Direction::NONE || get<1>(dp[target.x][target.y][turn]) == Direction::STILL)){
-          continue;
-        }
+        // if(no_stay_still && (get<1>(dp[target.x][target.y][turn]) == Direction::NONE || get<1>(dp[target.x][target.y][turn]) == Direction::STILL)){
+        //   continue;
+        // }
       // }
       efficient_possibilities.push_back({turn,
                                          (get<1>(dp[target.x][target.y][turn])==Direction::NONE)?Direction::STILL:get<1>(dp[target.x][target.y][turn]),

@@ -20,6 +20,7 @@ g++ -std=c++17 -march=native -oFast MyBot.cpp hlt/*.cpp -o MyBot
 g++ -std=c++17 -march=native -oFast ReferenceBot.cpp hltref/*.cpp -o ReferenceBot
 
 playWith2 32
+playWith2 40
 playWith2 48
 playWith2 56
 playWith2 64
@@ -27,6 +28,7 @@ playWith2 64
 printf "\n\n\n====4 player games====\n\n\n"
 
 playWith4 32
+playWith4 40
 playWith4 48
 playWith4 56
 playWith4 64
