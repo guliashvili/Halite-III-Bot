@@ -129,6 +129,7 @@ namespace hlt {
         }
 
         Position _safe_moves_position;
+        bool was_not_safe_sorry_global;
         std::vector<Direction> get_safe_moves(shared_ptr<Ship> ship, const Position& destination, bool recall=false, bool aggressive=false) {
           auto directions = get_unsafe_moves(ship->position, destination);
           std::vector<Direction> safe_directions;
@@ -141,12 +142,15 @@ namespace hlt {
           }
 
           if(safe_directions.size() == 0 && !is_safe(ship->position)){
+            was_not_safe_sorry_global = true;
             for(auto direction : directions){
               ship->position.directional_offset(_safe_moves_position, direction);
               if(is_safe(_safe_moves_position, 0, recall, aggressive)){
                   safe_directions.push_back(direction);
               }
             }
+          }else{
+            was_not_safe_sorry_global = false;
           }
 
           return safe_directions;

@@ -357,9 +357,13 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
     edge_dist++;
   }
 
+  bool no_stay_still = game.game_map->get_safe_moves(ship, target, recall).size() != 0 && !game.game_map->was_not_safe_sorry_global && !game.game_map->is_safe(ship->position, ship->halite, recall);
   vector<tuple<int, Direction, int>> efficient_possibilities;
   for (int turn = 0; turn < MAX_CUR_TURN; turn++) {
     if (get<2>(dp[target.x][target.y][turn]) == DP_MARK) {
+      if(no_stay_still && (get<1>(dp[target.x][target.y][turn]) == Direction::NONE || get<1>(dp[target.x][target.y][turn]) == Direction::STILL)){
+        continue;
+      }
       efficient_possibilities.push_back({turn,
                                          (get<1>(dp[target.x][target.y][turn])==Direction::NONE)?Direction::STILL:get<1>(dp[target.x][target.y][turn]),
                                          get<0>(dp[target.x][target.y][turn])});
