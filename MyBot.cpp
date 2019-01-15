@@ -6,14 +6,14 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <ctime>
 #include <optional>
 #include <random>
 #include <ratio>
+#include <set>
 #include <tuple>
 #include <unordered_map>
-#include <cmath>
-#include <set>
 
 using namespace std;
 using namespace hlt;
@@ -41,7 +41,7 @@ void updatePositionsOfOpponentsStuff() {
     for (int &i = position.y = 0; i < constants::HEIGHT; i++) {
       for (int &j = position.x = 0; j < constants::WIDTH; j++) {
         analytics_total_halite += max(0, game.game_map->at(position)->halite -
-                                   genes->total_halite_margin_substr);
+                                             genes->total_halite_margin_substr);
       }
     }
   }
@@ -50,67 +50,72 @@ void updatePositionsOfOpponentsStuff() {
   opponents_dropoffs.clear();
   for (auto player : game.players) {
     for (auto dropoff : player->all_dropoffs) {
-      if(player->id != game.me->id){
+      if (player->id != game.me->id) {
         opponents_dropoffs.push_back(dropoff->position);
       }
     }
     for (auto ship : player->ships) {
-      if(player->id != game.me->id){
+      if (player->id != game.me->id) {
         opponents_ships.push_back(ship->position);
       }
 
       analytics_ship_last_state[ship->id] = analytics_ship_cur_state[ship->id];
       analytics_ship_cur_state[ship->id] = ship;
-      if(analytics_ship_last_state[ship->id] != nullptr){
-        for(auto direction : ALL_CARDINALS){
-          if(ship->position == analytics_ship_last_state[ship->id]->position.directional_offset(direction)){
+      if (analytics_ship_last_state[ship->id] != nullptr) {
+        for (auto direction : ALL_CARDINALS) {
+          if (ship->position ==
+              analytics_ship_last_state[ship->id]->position.directional_offset(
+                  direction)) {
             analytics_ship_directions[ship->id].push_back(direction);
             break;
           }
         }
       }
 
-      if(ship->halite < game.game_map->at(ship->position)->move_cost()){
+      if (ship->halite < game.game_map->at(ship->position)->move_cost()) {
         analytics_ship_will_go_to[ship->id] = {Direction::STILL};
-      }else{
-        analytics_ship_will_go_to[ship->id] = {Direction::NORTH, Direction::SOUTH, Direction::WEST, Direction::EAST, Direction::STILL};
+      } else {
+        analytics_ship_will_go_to[ship->id] = {
+            Direction::NORTH, Direction::SOUTH, Direction::WEST,
+            Direction::EAST, Direction::STILL};
 
-        if(analytics_ship_directions[ship->id].size() > 5){
-          analytics_ship_directions[ship->id] = vector<Direction>(analytics_ship_directions[ship->id].end() - 5, analytics_ship_directions[ship->id].end());
+        if (analytics_ship_directions[ship->id].size() > 5) {
+          analytics_ship_directions[ship->id] =
+              vector<Direction>(analytics_ship_directions[ship->id].end() - 5,
+                                analytics_ship_directions[ship->id].end());
           set<Direction> directions_used;
-          for(auto direction : analytics_ship_directions[ship->id]){
-            if(direction == Direction::STILL || directions_used.count(invert_direction(direction))){
+          for (auto direction : analytics_ship_directions[ship->id]) {
+            if (direction == Direction::STILL ||
+                directions_used.count(invert_direction(direction))) {
               directions_used.clear();
               break;
             }
             directions_used.insert(direction);
           }
-          if(directions_used.size() != 0 && directions_used.size() <= 2){
+          if (directions_used.size() != 0 && directions_used.size() <= 2) {
 
             vector<Direction> will_not_go_to;
-            analytics_ship_will_go_to[ship->id] = {Direction::STILL}; //TODO will it really STILL?
+            analytics_ship_will_go_to[ship->id] = {
+                Direction::STILL}; // TODO will it really STILL?
 
-            for(Direction direction_used : directions_used){
+            for (Direction direction_used : directions_used) {
               will_not_go_to.push_back(invert_direction(direction_used));
             }
-            for(auto direction : ALL_CARDINALS){
-              if(find(will_not_go_to.begin(), will_not_go_to.end(), direction) == will_not_go_to.end()){
+            for (auto direction : ALL_CARDINALS) {
+              if (find(will_not_go_to.begin(), will_not_go_to.end(),
+                       direction) == will_not_go_to.end()) {
                 analytics_ship_will_go_to[ship->id].push_back(direction);
               }
             }
-
-
           }
         }
-
-
       }
     }
   }
 }
 
 // [1.0, 2 ^ (PLAYERS-1)] - impact of opponents dropoffs on the area
-double getDropoffImpact(Position pos, Position dropoff){
+double getDropoffImpact(Position pos, Position dropoff) {
   const int num_of_players = game.players.size();
   int distance = game.game_map->calculate_distance(pos, dropoff);
   return 2 - pow(genes->dropoff_effect_decay_base, distance);
@@ -125,7 +130,6 @@ double impactOfOpponentsDropoffs(Position pos) {
 }
 
 // end opponent analytics
-
 
 int get_milisecond_left() {
   return 2000 - duration_cast<std::chrono::milliseconds>(
@@ -168,7 +172,6 @@ Direction greedySquareMove(shared_ptr<Ship> ship, Position &target,
   }
 }
 
-
 bool faking_dropoff[64][64];
 
 pair<int, shared_ptr<Entity>>
@@ -177,7 +180,8 @@ getMinDistanceToDropoff(Position &position,
   pair<int, shared_ptr<Entity>> minDistance;
   minDistance.first = 999999999;
   for (const auto &dropoff : dropoffs) {
-    if(faking_dropoff[dropoff->position.x][dropoff->position.y] && game.me->halite < 3000){
+    if (faking_dropoff[dropoff->position.x][dropoff->position.y] &&
+        game.me->halite < 3000) {
       continue;
     }
     int cur_distance =
@@ -207,31 +211,36 @@ bool shouldGoHome(shared_ptr<Ship> ship) {
   return ship->halite >= constants::MAX_HALITE * 9 / 10;
 }
 
-
-bool is_inspired(shared_ptr<Ship> ship){
+bool is_inspired(shared_ptr<Ship> ship) {
   int enemies = 0;
   const int effect_distance = constants::INSPIRATION_RADIUS;
   const int x = ship->position.x;
   const int y = ship->position.y;
-  for(int delta_x = -effect_distance; delta_x <= effect_distance; delta_x++){
-    for(int delta_y = -(effect_distance-abs(delta_x)); delta_y <= (effect_distance-abs(delta_x)); delta_y++){
-      Position cur_pos( (((x+delta_x)%constants::WIDTH)+constants::WIDTH)%constants::WIDTH,  (((y+delta_y)%constants::HEIGHT)+constants::HEIGHT)%constants::HEIGHT);
+  for (int delta_x = -effect_distance; delta_x <= effect_distance; delta_x++) {
+    for (int delta_y = -(effect_distance - abs(delta_x));
+         delta_y <= (effect_distance - abs(delta_x)); delta_y++) {
+      Position cur_pos(
+          (((x + delta_x) % constants::WIDTH) + constants::WIDTH) %
+              constants::WIDTH,
+          (((y + delta_y) % constants::HEIGHT) + constants::HEIGHT) %
+              constants::HEIGHT);
       auto cur_cell = game.game_map->at(cur_pos);
-      enemies += cur_cell->is_occupied() && cur_cell->ship->owner != ship->owner;
+      enemies +=
+          cur_cell->is_occupied() && cur_cell->ship->owner != ship->owner;
     }
   }
 
   return enemies >= constants::INSPIRATION_SHIP_COUNT;
 }
 
-const int DP_MAX_TURNS = 3*64;
+const int DP_MAX_TURNS = 3 * 64;
 tuple<int, Direction, int> dp[64][64][DP_MAX_TURNS];
 
 int DP_MARK = 1;
 
 vector<tuple<int, Direction, int>>
 compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
-  if (get_milisecond_left() < 10*game.me->ships.size()) {
+  if (get_milisecond_left() < 10 * game.me->ships.size()) {
     return {{0, greedySquareMove(ship, target, recall), 0}};
   }
 
@@ -253,7 +262,8 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
   dp[ship->position.x][ship->position.y][0] = {ship->halite, Direction::NONE,
                                                DP_MARK};
 
-  const int MAX_CUR_TURN = 2 * game.game_map->calculate_distance(ship->position, target) + 6;
+  const int MAX_CUR_TURN =
+      2 * game.game_map->calculate_distance(ship->position, target) + 6;
 
   Position cur_edge_position = ship->position;
   int edge_dist = 0;
@@ -272,7 +282,9 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
       for (auto move : moves) {
         move_pos.emplace_back(move, cur_position.directional_offset(move));
       }
-      int upper_turn_bound = MAX_CUR_TURN - game.game_map->calculate_distance(cur_position, target) + 1;
+      int upper_turn_bound =
+          MAX_CUR_TURN -
+          game.game_map->calculate_distance(cur_position, target) + 1;
 
       for (int cur_turn = cur_dist; cur_turn < upper_turn_bound; cur_turn++) {
         const auto &cur_dp_state = dp[cur_position.x][cur_position.y][cur_turn];
@@ -316,7 +328,9 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
               }
 
               if (cur_halite == constants::MAX_HALITE ||
-                (halite_to_grab + constants::EXTRACT_RATIO - 1) / constants::EXTRACT_RATIO == 0) {
+                  (halite_to_grab + constants::EXTRACT_RATIO - 1) /
+                          constants::EXTRACT_RATIO ==
+                      0) {
                 break;
               }
               stay_turns++;
@@ -325,7 +339,8 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
                   constants::EXTRACT_RATIO;
               cur_halite += extraction;
 
-              // if(game.players.size() > 2 && cur_position == ship->position && stay_turns == 1 && is_inspired(ship)){
+              // if(game.players.size() > 2 && cur_position == ship->position &&
+              // stay_turns == 1 && is_inspired(ship)){
               //   log::log("inspired");
               //   cur_halite += extraction * 2;
               // }
@@ -355,18 +370,26 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
     edge_dist++;
   }
 
-  bool no_stay_still = game.game_map->get_safe_moves(ship, target, recall).size() != 0 && !game.game_map->was_not_safe_sorry_global && !game.game_map->is_safe(ship->position, ship->halite, recall);
+  // bool no_stay_still =
+  //     game.game_map->get_safe_moves(ship, target, recall).size() != 0 &&
+  //     !game.game_map->was_not_safe_sorry_global &&
+  //     !game.game_map->is_safe(ship->position, ship->halite, recall);
   vector<tuple<int, Direction, int>> efficient_possibilities;
   for (int turn = 0; turn < MAX_CUR_TURN; turn++) {
     if (get<2>(dp[target.x][target.y][turn]) == DP_MARK) {
       // if(game.players.size() != 2){
-        // if(no_stay_still && (get<1>(dp[target.x][target.y][turn]) == Direction::NONE || get<1>(dp[target.x][target.y][turn]) == Direction::STILL)){
-        //   continue;
-        // }
+      // if(no_stay_still && (get<1>(dp[target.x][target.y][turn]) ==
+      // Direction::NONE || get<1>(dp[target.x][target.y][turn]) ==
+      // Direction::STILL)){
+      //   continue;
       // }
-      efficient_possibilities.push_back({turn,
-                                         (get<1>(dp[target.x][target.y][turn])==Direction::NONE)?Direction::STILL:get<1>(dp[target.x][target.y][turn]),
-                                         get<0>(dp[target.x][target.y][turn])});
+      // }
+      efficient_possibilities.push_back(
+          {turn,
+           (get<1>(dp[target.x][target.y][turn]) == Direction::NONE)
+               ? Direction::STILL
+               : get<1>(dp[target.x][target.y][turn]),
+           get<0>(dp[target.x][target.y][turn])});
     }
   }
   return efficient_possibilities;
@@ -444,7 +467,10 @@ void pair_ships(vector<shared_ptr<Ship>> &ships,
         for (unsigned i = 0; i < ships.size(); i++) {
           auto ship = ships[i];
           int distance = game.game_map->calculate_distance(ship->position, pos);
-          if((distance+get<0>(getMinDistanceToDropoff(ship->position, game.me->all_dropoffs)))*1.1 < steps_left){
+          if ((distance + get<0>(getMinDistanceToDropoff(
+                              ship->position, game.me->all_dropoffs))) *
+                  1.1 <
+              steps_left) {
             candidates.emplace_back(i, pos,
                                     min(constants::MAX_HALITE - ship->halite,
                                         target_halite_amount - 3) /
@@ -502,7 +528,8 @@ bool should_ship_new_ship() {
     total_ships_count += player->ships.size();
   }
 
-  int current_halite_prediction = analytics_total_halite * total_me / total_ships_count;
+  int current_halite_prediction =
+      analytics_total_halite * total_me / total_ships_count;
   int next_halite_prediction =
       analytics_total_halite * (total_me + 1) / (total_ships_count + 1);
 
@@ -512,37 +539,44 @@ bool should_ship_new_ship() {
              genes->ship_spawn_step_margin;
 }
 
-
 // int map_halite_clone[64][64];
 
 vector<Position> faking_dropoffs;
-bool isTimeToDropoff(){
-  return game.turn_number > 50 && game.me->ships.size() > 20 && (faking_dropoffs.size() + game.me->dropoffs.size()) == 0;
+bool isTimeToDropoff() {
+  return game.turn_number > 50 && game.me->ships.size() > 20 &&
+         (faking_dropoffs.size() + game.me->dropoffs.size()) == 0;
 }
 
-Position find_dropoff_place(){
+Position find_dropoff_place() {
 
   pair<double, Position> best_dropoff;
   best_dropoff.first = -1;
   Position pos;
-  for(int &x = pos.x = 0; x < constants::WIDTH; x++){
-    for(int &y = pos.y = 0; y < constants::HEIGHT; y++){
-      if(game.game_map->at(pos)->has_structure() || faking_dropoff[pos.x][pos.y]){
+  for (int &x = pos.x = 0; x < constants::WIDTH; x++) {
+    for (int &y = pos.y = 0; y < constants::HEIGHT; y++) {
+      if (game.game_map->at(pos)->has_structure() ||
+          faking_dropoff[pos.x][pos.y]) {
         continue;
       }
       const int effect_distance = constants::WIDTH / game.players.size() / 4;
 
       double total_halite_in_range = 0;
-      for(int delta_x = -effect_distance; delta_x < effect_distance; delta_x++){
-        for(int delta_y = -(effect_distance-abs(delta_x)); delta_y < (effect_distance-abs(delta_x)); delta_y++){
-          Position cur_cell( (((x+delta_x)%constants::WIDTH)+constants::WIDTH)%constants::WIDTH,  (((y+delta_y)%constants::HEIGHT)+constants::HEIGHT)%constants::HEIGHT);
+      for (int delta_x = -effect_distance; delta_x < effect_distance;
+           delta_x++) {
+        for (int delta_y = -(effect_distance - abs(delta_x));
+             delta_y < (effect_distance - abs(delta_x)); delta_y++) {
+          Position cur_cell(
+              (((x + delta_x) % constants::WIDTH) + constants::WIDTH) %
+                  constants::WIDTH,
+              (((y + delta_y) % constants::HEIGHT) + constants::HEIGHT) %
+                  constants::HEIGHT);
           total_halite_in_range += game.game_map->at(cur_cell)->halite;
         }
       }
 
       total_halite_in_range /= impactOfOpponentsDropoffs(pos);
 
-      if(total_halite_in_range > get<0>(best_dropoff)){
+      if (total_halite_in_range > get<0>(best_dropoff)) {
         best_dropoff = {total_halite_in_range, pos};
       }
 
@@ -555,7 +589,8 @@ Position find_dropoff_place(){
   // for(auto player : game.players){
   //   for(auto dropoff : player->all_dropoffs){
   //     for(int delta_x = -)
-  //     min_dst = min(min_dst, game.game_map->calculate_distance(candidate_pos, dropoff->position))
+  //     min_dst = min(min_dst, game.game_map->calculate_distance(candidate_pos,
+  //     dropoff->position))
   //   }
   // }
 }
@@ -621,13 +656,16 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(
     for (auto &ship : going_home) {
       ships_no_still.push_back(ship);
     }
-
   }
-  was_blocker = was_blocker ||
-      std::find_if(direction_queue_temporary.begin(),
-                   direction_queue_temporary.end(), [](const auto &element) {
-                     return get<1>(element) == Direction::STILL && game.game_map->at(get<0>(element)->position)->collision;;
-                   }) != direction_queue_temporary.end();
+  was_blocker =
+      was_blocker ||
+      std::find_if(
+          direction_queue_temporary.begin(), direction_queue_temporary.end(),
+          [](const auto &element) {
+            return get<1>(element) == Direction::STILL &&
+                   game.game_map->at(get<0>(element)->position)->collision;
+            ;
+          }) != direction_queue_temporary.end();
   if (was_blocker) {
     ships_no_still.reserve(ships.size());
     for (auto &[ship, direction] : direction_queue_temporary) {
@@ -660,45 +698,53 @@ vector<shared_ptr<Ship>> oplock_doStepNoStill(
 }
 
 int savings = 0;
-vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
+vector<Command>
+doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_queue) {
 
   t1 = high_resolution_clock::now();
   vector<Command> constructions;
   me = game.me;
   unique_ptr<GameMap> &game_map = game.game_map;
-  game_map->init(me->id, genes, analytics_ship_will_go_to, game.players.size() == 4);
-
+  game_map->init(me->id, genes, analytics_ship_will_go_to,
+                 game.players.size() == 4);
 
   {
-    vector<Position*> assess;
-    for(auto &position : faking_dropoffs){
-      if(game.game_map->at(position)->has_structure() && game.game_map->at(position)->structure->owner != me->id){
+    vector<Position *> assess;
+    for (auto &position : faking_dropoffs) {
+      if (game.game_map->at(position)->has_structure() &&
+          game.game_map->at(position)->structure->owner != me->id) {
         faking_dropoff[position.x][position.y] = false;
         assess.push_back(&position);
-      }else{
-        game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
-        game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
+      } else {
+        game.me->dropoffs.push_back(
+            make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
+        game.me->all_dropoffs.push_back(
+            make_shared<Entity>(game.me->id, -1, position.x, position.y));
         game.game_map->at(position)->structure = game.me->dropoffs.back();
       }
     }
-    for(Position* position : assess){
+    for (Position *position : assess) {
       log::log("running backup");
 
       *position = find_dropoff_place();
       faking_dropoff[position->x][position->y] = true;
 
-      game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position->x, position->y));
-      game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position->x, position->y));
+      game.me->dropoffs.push_back(
+          make_shared<Dropoff>(game.me->id, -1, position->x, position->y));
+      game.me->all_dropoffs.push_back(
+          make_shared<Entity>(game.me->id, -1, position->x, position->y));
       game.game_map->at(*position)->structure = game.me->dropoffs.back();
     }
   }
-  if(isTimeToDropoff()){
+  if (isTimeToDropoff()) {
     savings += constants::DROPOFF_COST;
     Position position = find_dropoff_place();
     faking_dropoff[position.x][position.y] = true;
     faking_dropoffs.push_back(position);
-    game.me->dropoffs.push_back(make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
-    game.me->all_dropoffs.push_back(make_shared<Entity>(game.me->id, -1, position.x, position.y));
+    game.me->dropoffs.push_back(
+        make_shared<Dropoff>(game.me->id, -1, position.x, position.y));
+    game.me->all_dropoffs.push_back(
+        make_shared<Entity>(game.me->id, -1, position.x, position.y));
     game.game_map->at(position)->structure = game.me->dropoffs.back();
   }
 
@@ -715,23 +761,27 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
           AVERAGE_TIME_TO_HOME * genes->average_time_home_decay +
           NUM_OF_MOVES_FROM_HOME[ship->id] *
               (1 - genes->average_time_home_decay);
-      NUM_OF_MOVES_FROM_HOME[ship->id] = 0;  // at home (shipyard)
+      NUM_OF_MOVES_FROM_HOME[ship->id] = 0; // at home (shipyard)
     }
-    if (game_map->has_my_structure(ship->position) && faking_dropoff[ship->position.x][ship->position.y]){
-      if(me->halite >= constants::DROPOFF_COST){
+    if (game_map->has_my_structure(ship->position) &&
+        faking_dropoff[ship->position.x][ship->position.y]) {
+      if (me->halite >= constants::DROPOFF_COST) {
         me->halite -= constants::DROPOFF_COST;
         savings -= constants::DROPOFF_COST;
         faking_dropoff[ship->position.x][ship->position.y] = false;
-        faking_dropoffs.erase(std::remove(faking_dropoffs.begin(), faking_dropoffs.end(), ship->position), faking_dropoffs.end());
+        faking_dropoffs.erase(std::remove(faking_dropoffs.begin(),
+                                          faking_dropoffs.end(),
+                                          ship->position),
+                              faking_dropoffs.end());
         constructions.push_back(ship->make_dropoff());
-      }else{
+      } else {
         direction_queue.emplace_back(ship, Direction::STILL);
       }
-    }else if (!game_map->can_move(ship)) {
+    } else if (!game_map->can_move(ship)) {
       navigate(ship, Direction::STILL, direction_queue);
-    }else if(game_map->get_safe_from_enemy_moves_around(ship).size() == 0) {
+    } else if (game_map->get_safe_from_enemy_moves_around(ship).size() == 0) {
       navigate(ship, Direction::STILL, direction_queue);
-    }else {
+    } else {
       game.game_map->at(ship->position)->mark_safe();
       ships.push_back(ship);
     }
@@ -752,10 +802,10 @@ vector<Command> doStep(vector<tuple<shared_ptr<Ship>, Direction>> &direction_que
                          .count()) +
            " ships: " + to_string(me->ships.size()));
   auto spawn_ship = me->halite - savings >= constants::SHIP_COST &&
-             !(game_map->at(me->shipyard->position)->is_occupied()) &&
-             should_ship_new_ship();
+                    !(game_map->at(me->shipyard->position)->is_occupied()) &&
+                    should_ship_new_ship();
 
-  if(spawn_ship){
+  if (spawn_ship) {
     constructions.push_back(command::spawn_ship());
   }
   return constructions;

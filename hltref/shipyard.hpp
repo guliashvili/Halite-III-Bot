@@ -1,14 +1,12 @@
 #pragma once
 
-#include "entity.hpp"
 #include "command.hpp"
+#include "entity.hpp"
 
 namespace hlt {
-    struct Shipyard : Entity {
-        Shipyard(PlayerId owner, int x, int y) : Entity(owner, -1, x, y) {}
+struct Shipyard : Entity {
+  Shipyard(PlayerId owner, int x, int y) : Entity(owner, -1, x, y) {}
 
-        Command spawn() {
-            return hlt::command::spawn_ship();
-        }
-    };
-}
+  Command spawn() { return hlt::command::spawn_ship(); }
+};
+} // namespace hlt
