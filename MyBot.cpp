@@ -324,13 +324,11 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
                   (halite_to_grab + constants::EXTRACT_RATIO - 1) /
                   constants::EXTRACT_RATIO;
               cur_halite += extraction;
-              // log::log("a " + to_string(cur_position == ship->position));
-              // log::log("b " + to_string(stay_turns == 1));
-              // log::log("c " + to_string(is_inspired(ship)));
-              if(game.players.size() > 2 && cur_position == ship->position && stay_turns == 1 && is_inspired(ship)){
-                log::log("inspired");
-                cur_halite += extraction * 2;
-              }
+
+              // if(game.players.size() > 2 && cur_position == ship->position && stay_turns == 1 && is_inspired(ship)){
+              //   log::log("inspired");
+              //   cur_halite += extraction * 2;
+              // }
               cur_halite = min(cur_halite, constants::MAX_HALITE);
               halite_to_grab -= extraction;
             }
@@ -361,11 +359,11 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
   vector<tuple<int, Direction, int>> efficient_possibilities;
   for (int turn = 0; turn < MAX_CUR_TURN; turn++) {
     if (get<2>(dp[target.x][target.y][turn]) == DP_MARK) {
-      if(game.players.size() != 2){
+      // if(game.players.size() != 2){
         if(no_stay_still && (get<1>(dp[target.x][target.y][turn]) == Direction::NONE || get<1>(dp[target.x][target.y][turn]) == Direction::STILL)){
           continue;
         }
-      }
+      // }
       efficient_possibilities.push_back({turn,
                                          (get<1>(dp[target.x][target.y][turn])==Direction::NONE)?Direction::STILL:get<1>(dp[target.x][target.y][turn]),
                                          get<0>(dp[target.x][target.y][turn])});
