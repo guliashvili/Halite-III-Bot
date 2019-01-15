@@ -1,12 +1,10 @@
 # Setting Up the C++ Starter Kit
 
-    ./run_game.sh
-    
-This uses the included Makefile to build the sample bot and starter kit.
+Run ./compare_agains_reference.sh to compete current Bot in  MyBot.cpp, hlt/*
+with ReferenceBot.cpp, hltref/* . It only supports linux and MacOS. You have to
+extend script for windows.
 
-Linux users: if you're having problems running the bundled `halite` 
-executable, you will probably want to build your own from source. Grab the 
-source download from the Downloads page, extract it, and run `make` inside
-the extracted directory. Then, move the built `halite` executable to this
-directory. You will need GCC 7.2 or newer, but preferably the latest version
-of GCC.
+Run build_pkg.sh to archive the whole folder. zip will be created at
+/tmp/halite_pkg.zip .
+
+Enjoy the game.
