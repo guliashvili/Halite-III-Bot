@@ -207,6 +207,23 @@ bool shouldGoHome(shared_ptr<Ship> ship) {
   return ship->halite >= constants::MAX_HALITE * 9 / 10;
 }
 
+
+bool is_inspired(shared_ptr<Ship> ship){
+  int enemies = 0;
+  const int effect_distance = constants::INSPIRATION_RADIUS;
+  const int x = ship->position.x;
+  const int y = ship->position.y;
+  for(int delta_x = -effect_distance; delta_x <= effect_distance; delta_x++){
+    for(int delta_y = -(effect_distance-abs(delta_x)); delta_y <= (effect_distance-abs(delta_x)); delta_y++){
+      Position cur_pos( (((x+delta_x)%constants::WIDTH)+constants::WIDTH)%constants::WIDTH,  (((y+delta_y)%constants::HEIGHT)+constants::HEIGHT)%constants::HEIGHT);
+      auto cur_cell = game.game_map->at(cur_pos);
+      enemies += cur_cell->is_occupied() && cur_cell->ship->owner != ship->owner;
+    }
+  }
+
+  return enemies >= constants::INSPIRATION_SHIP_COUNT;
+}
+
 const int DP_MAX_TURNS = 3*64;
 tuple<int, Direction, int> dp[64][64][DP_MAX_TURNS];
 
@@ -299,7 +316,7 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
               }
 
               if (cur_halite == constants::MAX_HALITE ||
-                  halite_to_grab / constants::EXTRACT_RATIO == 0) {
+                (halite_to_grab + constants::EXTRACT_RATIO - 1) / constants::EXTRACT_RATIO == 0) {
                 break;
               }
               stay_turns++;
@@ -307,6 +324,13 @@ compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
                   (halite_to_grab + constants::EXTRACT_RATIO - 1) /
                   constants::EXTRACT_RATIO;
               cur_halite += extraction;
+              // log::log("a " + to_string(cur_position == ship->position));
+              // log::log("b " + to_string(stay_turns == 1));
+              // log::log("c " + to_string(is_inspired(ship)));
+              if(cur_position == ship->position && stay_turns == 1 && is_inspired(ship)){
+                log::log("inspired");
+                cur_halite += extraction * 2;
+              }
               cur_halite = min(cur_halite, constants::MAX_HALITE);
               halite_to_grab -= extraction;
             }
