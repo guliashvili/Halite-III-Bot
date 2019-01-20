@@ -21,16 +21,24 @@ hlt::Genes::Genes(int argc, const char *argv[]) {
     ship_spawn_step_margin = 60;
     collision_caution_margin = 200;
     dropoff_effect_decay_base = 1.01;
+    distance_ratio = 1;
+    dropoff_ratio = 0;
+    ship_dropoff_ratio = 0;
+    go_home_when = 0.9;
   } else {
     seed = Genes::get_arg(0, 10000000, argv[1]);
     extra_time_for_recall = Genes::get_arg(0, 10, argv[2]);
     greedy_walk_randomisation_margin = Genes::get_arg(0, 50, argv[3]);
     margin_to_create_new_ship = Genes::get_arg(500, 2000, argv[4]);
     total_halite_margin_substr = Genes::get_arg(10, 100, argv[5]);
-    average_time_home_decay = Genes::get_arg(double(0), double(1), argv[6]);
+    average_time_home_decay = Genes::get_arg(0.0, 1.0, argv[6]);
     ship_spawn_step_margin = Genes::get_arg(0, 200, argv[7]);
     collision_caution_margin = Genes::get_arg(0, 1000, argv[8]);
-    dropoff_effect_decay_base = Genes::get_arg(0, 1000, argv[9]);
+    dropoff_effect_decay_base = Genes::get_arg(0.5, 1.5, argv[9]);
+    distance_ratio = Genes::get_arg(0.0, 1.0, argv[10]);
+    dropoff_ratio = Genes::get_arg(0.0, 1.0, argv[11]);
+    ship_dropoff_ratio = Genes::get_arg(0.0, 1.0, argv[12]);
+    go_home_when = Genes::get_arg(0.5, 1.0, argv[13]);
   }
 
   log::log("seed: " + to_string(seed));

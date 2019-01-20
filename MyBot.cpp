@@ -40,8 +40,8 @@ void updatePositionsOfOpponentsStuff() {
     Position position;
     for (int &i = position.y = 0; i < constants::HEIGHT; i++) {
       for (int &j = position.x = 0; j < constants::WIDTH; j++) {
-        analytics_total_halite += max(0, game.game_map->at(position)->halite -
-                                             genes->total_halite_margin_substr);
+        analytics_total_halite += max(0, game.game_map->at(position)->halite-
+-                                             genes->total_halite_margin_substr);
       }
     }
   }
@@ -208,7 +208,7 @@ std::optional<Direction> isRecallTime(shared_ptr<Ship> ship) {
 
 bool shouldGoHome(shared_ptr<Ship> ship) {
   // Heuristic: return home with halite ship if collected >= 900
-  return ship->halite >= constants::MAX_HALITE * 9 / 10;
+  return ship->halite >= constants::MAX_HALITE * genes->go_home_when;
 }
 
 bool is_inspired(shared_ptr<Ship> ship) {
@@ -240,9 +240,9 @@ int DP_MARK = 1;
 
 vector<tuple<int, Direction, int>>
 compute_dp_walk(shared_ptr<Ship> ship, Position target, bool recall = false) {
-  if (get_milisecond_left() < 10 * game.me->ships.size()) {
-    return {{0, greedySquareMove(ship, target, recall), 0}};
-  }
+  // if (get_milisecond_left() < 10 * game.me->ships.size()) {
+  //   return {{0, greedySquareMove(ship, target, recall), 0}};
+  // }
 
   DP_MARK++;
 
@@ -467,14 +467,17 @@ void pair_ships(vector<shared_ptr<Ship>> &ships,
         for (unsigned i = 0; i < ships.size(); i++) {
           auto ship = ships[i];
           int distance = game.game_map->calculate_distance(ship->position, pos);
-          if ((distance + get<0>(getMinDistanceToDropoff(
-                              ship->position, game.me->all_dropoffs))) *
+          int distance_to_dropoff = get<0>(getMinDistanceToDropoff(
+                              pos, game.me->all_dropoffs));
+          int distance_from_ship_to_dropoff = get<0>(getMinDistanceToDropoff(
+                              ship->position, game.me->all_dropoffs));
+          if ((distance + distance_from_ship_to_dropoff) *
                   1.1 <
               steps_left) {
             candidates.emplace_back(i, pos,
                                     min(constants::MAX_HALITE - ship->halite,
                                         target_halite_amount - 3) /
-                                        double(distance + 1));
+                                        (distance * genes->distance_ratio + distance_to_dropoff * genes->dropoff_ratio + distance_from_ship_to_dropoff * genes->ship_dropoff_ratio + 1 ));
           }
         }
       }

@@ -77,9 +77,10 @@ def evaluateInd(tt):
 
     avrg = 0
     save = []
+# SZ = [32, 40, 48, 56, 64]
+    SZ = [32]
+    for i in range(len(SZ)):
 
-    for i in range(5):
-        SZ = [32, 40, 48, 56, 64]
         width = height = SZ[i]
         seed = random.randint(a=1, b=99999999)
 
@@ -94,12 +95,15 @@ def evaluateInd(tt):
         args = args + f'"./MyBot '
         args = args + f'{seed} ' + ' '.join([str(x) for x in t2]) + '"'
 
+        # print(args)
+
         save.append(args)
 
-        st1 = "Player 0, 'MyCppBot', was rank 1 with "
-        st2 = "Player 0, 'MyCppBot', was rank 1 with "
+        st1 = "Player 0, 'MyBot.cpp', was rank 1 with "
+        st2 = "Player 0, 'MyBot.cpp', was rank 0 with "
 
         out = subprocess.getoutput(args).split('\n')
+
         line = [line for line in out if st1 in line or st2 in line]
         if len(line) == 0:
             avrg += 0
@@ -111,7 +115,9 @@ def evaluateInd(tt):
                 st = st2
             avrg += int(line[line.find(st)+len(st):].split()[0])
 
-    avrg /= 5.0
+    avrg /= len(SZ) * 1.0
+    # if avrg == 0:
+    #     print(str(out))
     with open(f'evolution/{avrg}_random_res_{random.randint(1,100000)}.log', "w") as f:
         f.write(f'{tt[0]} = {tt[1]} = {save} = {avrg}')
     return (avrg, )
@@ -123,7 +129,7 @@ if __name__ == '__main__':
     creator.create("FitnessMax", base.Fitness, weights=(1.0,))
     creator.create("Individual", list, fitness=creator.FitnessMax)
 
-    IND_SIZE=6
+    IND_SIZE=13
 
     toolbox = base.Toolbox()
 
@@ -151,4 +157,4 @@ if __name__ == '__main__':
     stats.register("Min", numpy.min)
     stats.register("Max", numpy.max)
 
-    print(eaSimpleGIO(toolbox.population(n=10), toolbox, cxpb=0.5, mutpb=0.2, ngen=20, stats=stats, verbose=True))
+    print(eaSimpleGIO(toolbox.population(n=50), toolbox, cxpb=0.5, mutpb=0.2, ngen=50, stats=stats, verbose=True))
